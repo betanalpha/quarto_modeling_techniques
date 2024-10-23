@@ -129,6 +129,7 @@ p(y_{1}, z_{1}, \ldots, y_{N}, z_{N} \mid
 p(y_{n} \mid z_{n}) \, p(z_{n} \mid \lambda_{1}, \ldots, \lambda_{K})
 \\
 &=
+\prod_{n = 1}^{N}
 p_{z_{n}}(y_{n}) \, \lambda_{z_{n}}.
 \end{align*}
 On the other hand if the component probabilities can vary across
@@ -145,6 +146,7 @@ p(y_{1}, z_{1}, \ldots, y_{N}, z_{N} \mid
 p(y_{n} \mid z_{n}) \, p(z_{n} \mid \boldsymbol{\lambda}_{n})
 \\
 &=
+\prod_{n = 1}^{N}
 p_{z_{n}}(y_{n}) \, \lambda_{n, z_{n}}.
 \end{align*}
 
@@ -154,9 +156,16 @@ $$
 p(z_{n} \mid \tilde{y}_{n}, \lambda_{1}, \ldots, \lambda_{K})
 =
 \frac{ p_{z_{n}}(\tilde{y}_{n}) \, \lambda_{z_{n}}}
-{ \sum_{k = 1}^{K} p_{k}(\tilde{y}_{n}) \, \lambda_{k} },
+{ \sum_{k = 1}^{K} p_{k}(\tilde{y}_{n}) \, \lambda_{k} }
 $$
-again conditioned on the component probabilities and component
+or
+$$
+p(z_{n} \mid \tilde{y}_{n}, \lambda_{n, 1}, \ldots, \lambda_{n, K})
+=
+\frac{ p_{z_{n}}(\tilde{y}_{n}) \, \lambda_{n, z_{n}}}
+{ \sum_{k = 1}^{K} p_{k}(\tilde{y}_{n}) \, \lambda_{n, k} },
+$$
+again conditioned on fixed component probabilities and component
 probability distributions.
 
 ## Marginal Implementations
@@ -496,7 +505,7 @@ x_{k'}
 Formally any negative infinite input results in a vanishing exponential
 output
 $$
-exp(x_{k}) = exp(-\infty) = 0
+\exp(x_{k}) = \exp(-\infty) = 0
 $$
 and no contribution to the intermediate sum.
 $$
@@ -518,7 +527,7 @@ To avoid potential numerical complications entirely we need to drop the
 offending component _before_ trying to evaluate the inputs to the log
 sum exp function.  Specifically we compute
 $$
-x_{k} = \log(\lambda_{k}) + p_{k}(y)
+x_{k} = \log(\lambda_{k}) + \log \circ p_{k}(y)
 $$
 for only the components with $\lambda_{k} > 0$ and $p_{k}(y) > 0$, and
 then evaluate the log sum exp function on only these well-behaved
@@ -597,8 +606,8 @@ any observation using the posterior distribution that we derived in
 $$
 \tilde{z}
 \sim
-\frac{ p_{z}(y) \, \lambda_{z} }
-{ \sum_{k = 1}^{K} p_{k}(y) \, \lambda_{k} }.
+\frac{ p_{z}(\tilde{y}) \, \lambda_{z} }
+{ \sum_{k = 1}^{K} p_{k}(\tilde{y}) \, \lambda_{k} }.
 $$
 
 For example we could sample marginal posterior assignments using the
@@ -612,11 +621,26 @@ for (n in 1:N) {
                      + log(lambda[3]) + foo3_lpdf(y[n])
                      + log(lambda[4]) + foo4_lpdf(y[n]);
   simplex[4] ps = softmax(log_ps);
-  z[n] = categorical_rng(log_ps);
+  z[n] = categorical_rng(ps);
 }
 ```
 
-# Inflation Models
+Equivalently we can use the built-int `categorical_logit_rng` function
+which automatically applies the `softmax` function to the input
+arguments.
+
+```stan
+// Loop over observations
+for (n in 1:N) {
+  vector[4] log_ps =   log(lambda[1]) + foo1_lpdf(y[n])
+                     + log(lambda[2]) + foo2_lpdf(y[n])
+                     + log(lambda[3]) + foo3_lpdf(y[n])
+                     + log(lambda[4]) + foo4_lpdf(y[n]);
+  z[n] = categorical_log_rng(log_ps);
+}
+```
+
+# Inflation Models { #sec:inflation }
 
 **Inflation models** are a special case of mixture modeling where one or
 more of the component probability distributions concentrate on single
@@ -677,11 +701,11 @@ That said because the Dirac component allocates zero probability to so
 many elements we have to take care when evaluating the logarithm of this
 mixed probability mass function.  If $y = y_{\mathrm{inf}}$ then
 $$
-\delta_{\mathrm{inf}}(y) = 1
+\delta_{y_{\mathrm{inf}}}(y = y_{\mathrm{inf}}) = 1
 $$
 and
 $$
-\log \circ \, \delta_{\mathrm{inf}}(y) = 0.
+\log \circ \, \delta_{y_{\mathrm{inf}}}(y = y_{\mathrm{inf}}) = 0.
 $$
 At this point evaluating the log probability mass function is
 straightforward,
@@ -689,15 +713,18 @@ straightforward,
 \log \circ \, p(y_{\mathrm{inf}})
 &=
 \text{log-sum-exp}\big(
-\log(\lambda) + \log \circ \, p_{\mathrm{baseline}}(y_{\mathrm{inf}}),
+  \log(\lambda)
++ \log \circ \, p_{\mathrm{baseline}}(y_{\mathrm{inf}}),
 \\
 &
 \hphantom{=\text{log-sum-exp}\big(\;}
-\log(1 - \lambda) + \log \circ \, \delta_{\mathrm{inf}}(y_{\mathrm{inf}}) \; \big)
+  \log(1 - \lambda)
++ \log \circ \, \delta_{y_{\mathrm{inf}}}(y_{\mathrm{inf}}) \; \big)
 \\
 &=
 \text{log-sum-exp}\big(
-\log(\lambda) + \log \circ \, p_{\mathrm{baseline}}(y_{\mathrm{inf}}) ),
+  \log(\lambda)
++ \log \circ \, p_{\mathrm{baseline}}(y_{\mathrm{inf}}) ),
 \\
 &
 \hphantom{=\text{log-sum-exp}\big(\;}
@@ -705,7 +732,8 @@ straightforward,
 \\
 &=
 \text{log-sum-exp}\big(
-\log(\lambda) + \log \circ \, p_{\mathrm{baseline}}(y_{\mathrm{inf}}) ),
+  \log(\lambda)
++ \log \circ \, p_{\mathrm{baseline}}(y_{\mathrm{inf}}) ),
 \\
 &
 \hphantom{=\text{log-sum-exp}\big(\;}
@@ -714,11 +742,11 @@ straightforward,
 
 On the other hand if $y \ne y_{\mathrm{inf}}$ then
 $$
-\delta_{\mathrm{inf}}(y) = 0
+\delta_{y_{\mathrm{inf}}}(y \ne y_{\mathrm{inf}}) = 0
 $$
 and
 $$
-\log \circ \, \delta_{\mathrm{inf}}(y) = -\infty.
+\log \circ \, \delta_{y_{\mathrm{inf}}}(y \ne y_{\mathrm{inf}}) = -\infty.
 $$
 To avoid numerical issues arising from the negative infinity we need to
 follow the procedure introduced in [Section 1.3](#sec:stable_impl),
@@ -727,7 +755,7 @@ first accounting for the zero,
 p(y)
 &=
   \lambda \, p_{\mathrm{baseline}}(y)
-+ (1 - \lambda) \, \delta_{\mathrm{inf}}(y)
++ (1 - \lambda) \, \delta_{y_{\mathrm{inf}}}(y)
 \\
 &=
 \lambda \, p_{\mathrm{baseline}}(y) + (1 - \lambda) \, 0
@@ -882,6 +910,149 @@ then we know that it _had_ to have been generated by another component.
 Because of this lack of ambiguity we can always separate the inflated
 and non-inflated values and model them separately without compromising
 the consistency of our inferences.
+
+# Categorical and Multinomial Mixture Models
+
+Categorical probability distributions are relatively simple objects, but
+mixtures of categorical probability distributions exhibit a unique
+property.
+
+Recall that every categorical probability distribution over a set of
+$K$ unstructured elements is defined by $K$ atomic probabilities
+$$
+\mathrm{categorical}( \{ k \} \mid \mathbf{q})
+= q_{k}.
+$$
+Conveniently we can also write this as a mixture model where every
+component probability distribution is a Dirac probability distribution,
+$$
+\mathrm{categorical}( \mathsf{z} \mid \mathbf{q} )
+=
+\sum_{k = 1}^{K} q_{k} \, \delta_{ \{ k \} }( \mathsf{z} ),
+$$
+or equivalently a mixture probability mass function,
+$$
+\mathrm{categorical}( z \mid \mathbf{q})
+=
+\sum_{k = 1}^{K} q_{k} \, \delta_{ k }( z ),
+$$
+where the Dirac probability distribution and probability mass function
+behave as in [Section 2](#sec:inflation).
+
+Interestingly the mixture of two different categorical probability
+distributions is always another categorical probability distribution,
+\begin{align*}
+\lambda \, \mathrm{categorical}( z \mid \mathbf{q}_{1}) &
+\\
++
+(1 - \lambda) \, \mathrm{categorical}( z \mid \mathbf{q}_{2})
+&=
+\lambda \, \sum_{k = 1}^{K} q_{1k} \, \delta_{ k }( z )
++
+(1 - \lambda) \, \sum_{k = 1}^{K} q_{2k} \, \delta_{ k }( z )
+\\
+&=
+\sum_{k = 1}^{K}
+\left[ \lambda \, q_{1k} + (1 - \lambda) \, q_{2k} \right]
+\, \delta_{ k }( z )
+\\
+&=
+\mathrm{categorical}( z \mid
+\lambda \, \mathbf{q}_{1} + (1 - \lambda) \, \mathbf{q}_{2}).
+\end{align*}
+Indeed the mixture of any number of categorical probability
+distributions defines another categorical probability distribution,
+\begin{align*}
+\sum_{j = 1}^{J}
+\lambda_{j} \mathrm{categorical}( z \mid \mathbf{q}_{j} )
+&=
+\sum_{j = 1}^{J} \lambda_{j} \,
+\sum_{k = 1}^{K} q_{jk} \, \delta_{ k }( z )
+\\
+&=
+\sum_{k = 1}^{K}
+\left[ \sum_{j = 1}^{J} \lambda_{j} \, q_{jk} \right] \,
+\delta_{ k }( z )
+\\
+&=
+\mathrm{categorical}( z \mid
+\textstyle \sum_{j = 1}^{J} \lambda_{j} \, \mathbf{q}_{j} ).
+\end{align*}
+In other words mixing categorical probability distributions is
+equivalent to mixing the corresponding simplex parameters together.
+
+The closure of categorical probability distributions under mixtures, and
+the corresponding duality between probability distribution mixtures and
+simplex parameter mixtures, is quite exceptional.  Consider, for
+example, the multinomial probability distribution over element counts
+induced by the identical and independent product of an initial
+categorical probability distribution,
+$$
+\mathrm{multinomial}( n_{1}, \ldots, n_{K} \mid \mathbf{q})
+=
+N! \prod_{k = 1}^{K} \frac{ q_{k}^{n_{k}} }{ n_{k}! }.
+$$
+While mixing simplices together is equivalent to mixing the
+corresponding categorical probability distributions together,
+\begin{align*}
+\mathrm{categorical} & ( z \mid
+\textstyle \sum_{j = 1}^{J} \lambda_{j} \, \mathbf{q}_{j} )
+\\
+&=
+\sum_{j = 1}^{J}
+\lambda_{j} \mathrm{categorical}( z \mid \mathbf{q}_{j} ),
+\end{align*}
+it is not equivalent to mixing the corresponding multinomial probability
+distributions together (@fig-binomial)
+\begin{align*}
+\mathrm{multinomial} & ( n_{1}, \ldots, n_{K} \mid
+\textstyle \sum_{j = 1}^{J} \lambda_{j} \, \mathbf{q}_{j} )
+\\
+&\ne
+\sum_{j = 1}^{J} \lambda_{j}
+\mathrm{multinomial}( n_{1}, \ldots, n_{K} \mid \mathbf{q}_{j})!
+\end{align*}
+
+![Mixing categorical probability distributions is equivalent to mixing
+the defining simplex parameters, but this property does generalize to
+other probability distributions derived from categorical probability
+distributions, such as the multinomial distribution.  For example a
+mixture of the two binomial probability distributions
+$\mathrm{binominal}(n \mid N, p_{1})$ and
+$\mathrm{binominal}(n \mid N, p_{2})$ is not the same as the binomial
+distribution defined by the mixture of $p_{1}$ and $p_{2}$ even
+though
+$\lambda \, \mathrm{Bernoulli}(p_{1}) + (1 - \lambda) \, \mathrm{Bernoulli}(p_{2})$
+is the same as
+$\mathrm{Bernoulli}(\lambda \, p_{1} + (1 - \lambda) \, p_{2})$. ](
+figures/binomial/binomial){
+width=90% #fig-binomial}
+
+The left-hand side
+$$
+\mathrm{multinomial}( n_{1}, \ldots, n_{K} \mid
+\textstyle \sum_{j = 1}^{J} \lambda_{j} \, \mathbf{q}_{j} )
+$$
+corresponds to _heterogeneous_ component categorical probability
+distributions.  Specifically it implies that a proportion $\lambda_{j}$
+of the $N$ component categorical probability distributions are
+configured by the simplex $\mathbf{q}_{j}$.  These heterogeneous
+contributions to the counts wash out the detail of each simplex,
+always resulting in a uni-modal probability distribution.
+
+On the other side
+$$
+\sum_{j = 1}^{J} \lambda_{j}
+\mathrm{multinomial}( n_{1}, \ldots, n_{K} \mid \mathbf{q}_{j})
+$$
+corresponds to _homogeneous_ component categorical probability
+distributions.  For each simplex $\mathbf{q}_{j}$ the corresponding
+multinomial distribution concentrates around the count values
+$q_{jk} \, N$.  The mixture model overlays these distinct peaks on top
+of each other, resulting in a multi-modal probability distribution.
+
+In general we have to take care to avoid misinterpreting models defined
+by mixtures of parameters as proper mixture models.
 
 # Mixture Model Inferences
 
@@ -2269,11 +2440,11 @@ Bayesian model from being exchangeable with an asymmetric prior model.
 Here let's assume that we have domain expertise that constrains the
 location of the component models to non-overlapping intervals,
 \begin{align*}
--6 \lessapprox &\mu_{1} \lessapprox -2
+-6 \lessapprox & \; \mu_{1} \lessapprox -2
 \\
--2 \lessapprox &\mu_{1} \lessapprox +2
+-2 \lessapprox & \; \mu_{2} \lessapprox +2
 \\
-+2 \lessapprox &\mu_{1} \lessapprox +6.
++2 \lessapprox & \; \mu_{3} \lessapprox +6.
 \end{align*}
 
 ```{.stan include="stan_programs/normal_mix2b.stan" filename="normal\\\_mix2b.stan"}
@@ -2921,6 +3092,8 @@ to model data generating processes with conditional, but unobserved,
 logic.
 
 # Acknowledgements {-}
+
+I thank jd for helpful comments.
 
 A very special thanks to everyone supporting me on Patreon:
 Adam Fleischhacker, Adriano Yoshino, Alejandro Navarro-Martínez,
