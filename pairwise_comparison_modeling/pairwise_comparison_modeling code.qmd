@@ -1,0 +1,1075 @@
+
+
+## Modeling a Gaming League
+
+For our final example we'll analyze the outcome of games in an organized
+league.
+
+Each game consists of two teams competing to score points, with the
+winner of each game determined by the team with the most points.  If the
+two teams have the same score at the end of the game then the game ends
+in a tie.  The games are not played at neutral locations; instead an
+_away_ team travels to the venue of the opposing _home_ team.
+
+The league itself is comprised of ten teams.  During the season each
+team plays each other in a repeated round robin format, with every
+possible matchup taking place exactly 8 times.  In total the season
+consists of 360 total games, with 5 games played per week across 72
+total weeks.
+
+### Explore data
+
+Before attempting our first model let's take a look at the available
+data.
+
+```{r}
+data <- read_rdump('data/season.data.R')
+```
+
+The repeated round robin format ensures a balanced schedule, with
+every team playing each other team the same number of times.
+
+```{r}
+par(mfrow=c(1, 1), mar=c(0, 0, 0, 0))
+
+adj <- build_adj_matrix(data$N_teams, data$N_games,
+                        data$home_idx, data$away_idx)
+plot_undir_graph(adj)
+```
+
+In particular there are no disconnected components in the resulting
+connectivity graph.
+
+```{r}
+compute_connected_components(adj)
+```
+
+While the schedule is uniform the team performance is not.  Some teams
+consistently score more points than others, and some teams exhibit
+more variation in the scoring than others.
+
+```{r}
+par(mfrow=c(5, 2), mar=c(5, 5, 1, 1))
+
+for (t in 1:data$N_teams) {
+  y_team <- c(data$y_home[data$home_idx == t],
+              data$y_away[data$away_idx == t])
+  util$plot_line_hist(y_team, 0, 160, 10,
+                      xlab="Score", main=paste("Team", t))
+}
+```
+
+Overall the home teams appear to score more points than the away teams.
+
+```{r}
+par(mfrow=c(1, 1), mar=c(5, 5, 1, 1))
+
+util$plot_line_hists(data$y_home, data$y_away,
+                     0, 160, 5, xlab="Score")
+text(85, 40, "Home", col="black")
+text(43, 65, "Away", col=util$c_dark_teal)
+```
+
+This results in an empirical distribution of score differentials that is
+slightly biased to positive values.  The score differential is a
+particularly useful summary of a game because it immediately
+communicates the winner -- positive values indicate a home team win,
+negative values an away team win, and zero values a tie.
+
+```{r}
+par(mfrow=c(1, 1), mar=c(5, 5, 1, 1))
+
+util$plot_line_hist(data$y_home - data$y_away,
+                    -70, 110, 10,
+                    xlab="Home Score - Away Score")
+abline(v=0, lty=2, lwd=3, col="#DDDDDD")
+```
+
+Another useful summary is the total score which captures for example
+whether offensive or defensive play dictated each game.
+
+```{r}
+par(mfrow=c(1, 1), mar=c(5, 5, 1, 1))
+
+util$plot_line_hist(data$y_home + data$y_away,
+                    60, 210, 10,
+                    xlab="Home Score + Away Score")
+```
+
+### Attempt 1
+
+At this point is should come as no surprise that we're going to reach
+for a pairwise comparison modeling techniques to model these games.  The
+key question, however, is exactly what comparison we want to model.
+
+We could model the outcome of each game, but that approach complicated
+by the presence of ties and ignores a most of the available data.  We
+can build a richer picture of each game by instead modeling the score
+of each team, treating them as the outcome of a pairwise comparison
+between that team's offensive skill and their opponent's defensive
+skill.
+
+Because the scores are non-negative integers a natural place to start
+is a Poisson model,
+$$
+\text{Poisson}(y_{n, i_{1} i_{2}} \mid \lambda_{i_{1} i_{2}} ).
+$$
+To start let's couple $\lambda_{i_{1} i_{2}}$ to the difference in
+offensive and defensive skills with an exponential baseline function,
+\begin{align*}
+\lambda_{i_{1} i_{2}}
+&=
+\exp \big(  \alpha
+           + \beta_{i_{1}}^{\mathrm{off}}
+           - \beta_{i_{2}}^{\mathrm{def}} \big)
+\\
+&=
+\exp \big(   \alpha \big) \,
+\exp \big( + \beta_{i_{1}}^{\mathrm{off}} \big) \,
+\exp \big( - \beta_{i_{2}}^{\mathrm{def}} \big).
+\end{align*}
+Note that this is a bipartite pairwise comparison model -- we can
+compare any team's offense to any team's defense, but we cannot compare
+offensives or defences to each other,
+
+
+In order to ensure that each parameter can be informed by the observed
+game outcomes we need to anchor one of the offensive skills and one of
+the defensive skills to zero,
+\begin{align*}
+\delta_{i}^{\mathrm{off}}
+&=
+\beta_{i}^{\mathrm{off}} - \beta_{i'}^{\mathrm{off}}
+\\
+\delta_{i}^{\mathrm{def}}
+&=
+\beta_{i}^{\mathrm{def}} - \beta_{i'}^{\mathrm{def}},
+\end{align*}
+yielding the model
+$$
+\lambda_{i_{1} i_{2}}
+=
+\exp \big(   \alpha \big) \,
+\exp \big( + \delta_{i_{1}}^{\mathrm{off}} \big) \,
+\exp \big( - \delta_{i_{2}}^{\mathrm{def}} \big).
+$$
+Here we will anchor the offensive and defensive skills of the first team
+to zero.
+
+We can then interpret the baseline $\alpha$ as the average score if the
+anchored offensive played the anchored defense.  Because we anchored
+the offensive and defensive skills of the same team this is a purely
+hypothetical matchup, but we can exclude unreasonable behaviors.  For
+demonstration purposes let's say that our domain expertise is consistent
+with
+$$
+25 \lessapprox  \exp \big( \alpha \big) \lessapprox 75
+$$
+or equivalently
+$$
+3.77 - 0.55 \lessapprox \alpha \lessapprox 3.77 + 0.55.
+$$
+
+The relative skill parameters $\delta_{i}^{\mathrm{off}}$ and
+$\delta_{i}^{\mathrm{off}}$ then determine if the other teams' offense
+and defense are better than those of the anchor team.  Here we'll take a
+pretty conservative prior threshold
+$$
+0.1
+\lessapprox
+\exp \big( \delta_{i}^{\mathrm{off/def}} \big)
+\lessapprox
+7.4
+$$
+or
+$$
+-2 \lessapprox \delta_{i}^{\mathrm{off/def}} \lessapprox 2.
+$$
+
+```{.stan include="stan_programs/season1.stan" filename="season1.stan"}
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| cache: true
+fit <- stan(file="stan_programs/season1.stan",
+            data=data, seed=8438338,
+            warmup=1000, iter=2024, refresh=0)
+```
+
+One of the Markov chains exhibits large auto-correlations in the
+baseline $\alpha$, but the lack of auto-correlation in the other Markov
+chains, let alone any other diagnostics warnings, suggests that we
+should have be able to inform accurate Markov chain Monte Carlo
+estimators.
+
+```{r}
+diagnostics <- util$extract_hmc_diagnostics(fit)
+util$check_all_hmc_diagnostics(diagnostics)
+
+samples <- util$extract_expectand_vals(fit)
+base_samples <- util$filter_expectands(samples,
+                                       c('alpha',
+                                         'delta_off_free',
+                                         'delta_def_free'),
+                                       check_arrays=TRUE)
+util$check_all_expectand_diagnostics(base_samples)
+```
+
+Unfortunately the posterior retrodictive performance suggests that this
+model is not sophisticated enough to capture the details of the
+observed data.  Specifically both the observed home scores and away
+scores exhibit a skewness, towards larger values in the first case and
+smaller values in the second case, that the posterior predictive
+distribution cannot reproduce.
+
+```{r}
+par(mfrow=c(1, 2), mar=c(5, 5, 1, 1))
+
+util$plot_hist_quantiles(samples, 'y_home_pred', 10, 130, 5,
+                         baseline_values=data$y_home,
+                         xlab="Home Score")
+
+util$plot_hist_quantiles(samples, 'y_away_pred', 10, 130, 5,
+                         baseline_values=data$y_away,
+                         xlab="Away Score")
+```
+
+Even more strikingly the observed score differentials are biased towards
+much larger values relative that the posterior predictive score
+differentials.
+
+```{r}
+par(mfrow=c(1, 1), mar=c(5, 5, 1, 1))
+
+util$plot_hist_quantiles(samples, 'y_diff_pred', -80, 80, 10,
+                         baseline_values=data$y_home - data$y_away,
+                         xlab="Home Score - Away Score")
+```
+
+That said the observed and posterior predictive total scores are
+consistent with each other.
+
+```{r}
+par(mfrow=c(1, 1), mar=c(5, 5, 1, 1))
+
+util$plot_hist_quantiles(samples, 'y_sum_pred', 50, 210, 10,
+                         baseline_values=data$y_home + data$y_away,
+                         xlab="Home Score + Away Score")
+```
+
+Overall it looks like the data exhibits a home-field advantage that our
+model cannot accommodate.
+
+### Attempt 2
+
+Fortunately a home-field advantage is straightforward to incorporate
+into our model by offsetting the skill differences.  Specifically for
+we expand our model for the home team score to
+$$
+\lambda_{i_{1} i_{2}}
+=
+\exp \big(   \alpha + \eta^{\mathrm{off}} \big) \,
+\exp \big( + \delta_{i_{1}}^{\mathrm{off}} \big) \,
+\exp \big( - \delta_{i_{2}}^{\mathrm{def}} \big)
+$$
+and for the away team score to
+$$
+\lambda_{i_{1} i_{2}}
+=
+\exp \big(   \alpha - \eta^{\mathrm{def}} \big) \,
+\exp \big( + \delta_{i_{1}}^{\mathrm{off}} \big) \,
+\exp \big( - \delta_{i_{2}}^{\mathrm{def}} \big).
+$$
+The negative sign on $\eta^{\mathrm{def}}$ is somewhat arbitrary, but it
+ensures that for both scores a positive $\eta$ corresponds to a
+home-field advantage.
+
+Let's say that our available domain expertise constrains the home-field
+advantage to relatively small proportional changes,
+$$
+0.78
+\lessapprox
+\exp \big( \eta^{\mathrm{off/def}} \big)
+\lessapprox
+1.28
+$$
+or
+$$
+-0.25 \lessapprox \eta^{\mathrm{off/def}}\lessapprox +0.25.
+$$
+
+```{.stan include="stan_programs/season2.stan" filename="season2.stan"}
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| cache: true
+fit <- stan(file="stan_programs/season2.stan",
+            data=data, seed=8438338,
+            warmup=1000, iter=2024, refresh=0)
+```
+
+Conveniently the diagnostics are now completely clean.
+
+```{r}
+diagnostics <- util$extract_hmc_diagnostics(fit)
+util$check_all_hmc_diagnostics(diagnostics)
+
+samples <- util$extract_expectand_vals(fit)
+base_samples <- util$filter_expectands(samples,
+                                       c('alpha',
+                                         'eta_off',
+                                         'eta_def',
+                                         'delta_off_free',
+                                         'delta_def_free'),
+                                       check_arrays=TRUE)
+util$check_all_expectand_diagnostics(base_samples)
+```
+
+Overall the posterior predictive performance has improved, but there's
+still a noticeable disagreement in the shape of the summary statistics.
+
+For example while the observed and posterior predictive home scores now
+agree the separated away scores still exhibit a skew towards smaller
+values that the posterior predictive distribution does not match.
+
+```{r}
+par(mfrow=c(1, 2), mar=c(5, 5, 1, 1))
+
+util$plot_hist_quantiles(samples, 'y_home_pred', 0, 160, 5,
+                         baseline_values=data$y_home,
+                         xlab="Home Score")
+
+util$plot_hist_quantiles(samples, 'y_away_pred', 0, 160, 5,
+                         baseline_values=data$y_away,
+                         xlab="Away Score")
+```
+
+The observed and posterior predictive score differentials now align, but
+the observed behaviors are more over-dispersed than the posterior
+predictive behaviors.
+
+```{r}
+par(mfrow=c(1, 1), mar=c(5, 5, 1, 1))
+
+util$plot_hist_quantiles(samples, 'y_diff_pred', -80, 120, 10,
+                         baseline_values=data$y_home - data$y_away,
+                         xlab="Home Score - Away Score")
+```
+
+We see a similar observed over-dispersion in the total scores, with a
+skew towards smaller values in the peak and a heavier tail towards
+larger values than what we see in the posterior predictive behavior.
+
+```{r}
+par(mfrow=c(1, 1), mar=c(5, 5, 1, 1))
+
+util$plot_hist_quantiles(samples, 'y_sum_pred', 50, 230, 10,
+                         baseline_values=data$y_home + data$y_away,
+                         xlab="Home Score + Away Score")
+```
+
+Given these patterns of disagreement we might be tempted to consider a
+more flexible observational model, in particular expanding the Poisson
+model into a negative binomial model.  If we can identify and then model
+a more mechanistic source of the excess variation, however, then we
+would be rewarded with more precise and generalizeable inferences.  To
+that end let's see if we can find heterogeneity that manifests in the
+observed behaviors but not the posterior predictive behaviors.
+
+For example there might be variation in the team performances beyond
+what we have already incorporated into the current model.  Examining
+the observed and posterior predictive scores for each team, however,
+doesn't reveal any obvious discrepancy.
+
+```{r}
+par(mfrow=c(2, 2), mar=c(5, 5, 3, 1))
+
+for (t in 1:data$N_teams) {
+  team_scores_obs <- c(data$y_home[data$home_idx == t],
+                       data$y_away[data$away_idx == t])
+
+  team_scores <- c(lapply(which(data$home_idx == t),
+                          function(n)
+                          samples[[paste0('y_home_pred[', n, ']')]]),
+                   lapply(which(data$away_idx == t),
+                          function(n)
+                          samples[[paste0('y_away_pred[', n, ']')]]))
+  names(team_scores) <- sapply(1:data$N_weeks,
+                               function(n) paste0('y[', n, ']'))
+
+  util$plot_hist_quantiles(team_scores, 'y', 0, 160, 10,
+                           baseline_values=team_scores_obs,
+                           xlab="Score", main=paste("Team", t))
+}
+```
+
+Another possible source of heterogeneity is systematic trends across
+time.  To investigate that we can survey the behavior of the score
+differential summary statistic early in the season, in the middle of the
+season, and towards the end of season.
+
+```{r}
+par(mfrow=c(3, 1), mar=c(5, 5, 3, 1))
+
+names <- lapply(1:120, function(n) paste0('y_diff_pred[', n, ']'))
+filt_samples <- lapply(names, function(n) samples[[n]])
+names(filt_samples) <- names
+
+util$plot_hist_quantiles(filt_samples, 'y_diff_pred', -80, 120, 10,
+                         baseline_values=data$y_home[1:120] -
+                                         data$y_away[1:120],
+                         xlab="Home Score - Away Score",
+                         main="First Third of Season")
+
+names <- lapply(121:240, function(n) paste0('y_diff_pred[', n, ']'))
+filt_samples <- lapply(names, function(n) samples[[n]])
+names(filt_samples) <- names
+
+util$plot_hist_quantiles(filt_samples, 'y_diff_pred', -80, 120, 10,
+                         baseline_values=data$y_home[121:240] -
+                                         data$y_away[121:240],
+                         xlab="Home Score - Away Score",
+                         main="Middle Third of Season")
+
+names <- lapply(241:360, function(n) paste0('y_diff_pred[', n, ']'))
+filt_samples <- lapply(names, function(n) samples[[n]])
+names(filt_samples) <- names
+
+util$plot_hist_quantiles(filt_samples, 'y_diff_pred', -80, 120, 10,
+                         baseline_values=data$y_home[241:360] -
+                                         data$y_away[241:360],
+                         xlab="Home Score - Away Score",
+                         main="Final Third of Season")
+```
+
+Here we see a clear discrepancy between the observed and posterior
+predictive behaviors.  Because our model is static across time the
+posterior predictive behavior is the same for all three time intervals,
+but the observed behavior gradually becomes less and less variable as
+the season progresses.
+
+### Attempt 3
+
+The main source of systematic game score variation in our model are the
+heterogeneous team skills.  One reason why we might see decreasing
+variation in game scores across time is a weakening influence of those
+skills.  For example after a long season of persistent games the players
+on each time might become more and more fatigued, reducing their impact
+on the later games.
+
+We can incorporate this hypothesis into our model by adding a
+discrimination variable that evolves with time,
+$$
+\lambda_{i_{1} i_{2}}
+=
+\exp \big(   \alpha \pm \eta^{\mathrm{off/def}} \big)
+           + \gamma(t) \cdot
+               \big(  \delta_{i_{1}}^{\mathrm{off}}
+                    - \delta_{i_{2}}^{\mathrm{def}} \big)
+     \big).
+$$
+Because we expect fatigue to only increase as the season progresses the
+outputs $\gamma(t)$ should decay with time.  Here let's assume the
+functional form
+$$
+\gamma(t) = \gamma_{0}^{t / 1 \, \mathrm{week} }.
+$$
+
+Finally we'll use a prior model that constrains $\gamma_{0}$ to
+$$
+0.8 \lessapprox \gamma_{0} \lessapprox 1.0
+$$
+so that by the effective discrimination by the end of season is
+contained to
+$$
+10^{-7} \lessapprox gamma^{72} \lessapprox 1.
+$$
+
+```{.stan include="stan_programs/season3.stan" filename="season3.stan"}
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| cache: true
+fit <- stan(file="stan_programs/season3.stan",
+            data=data, seed=8438338,
+            warmup=1000, iter=2024, refresh=0)
+```
+
+A few of the marginal auto-correlation are a bit low, but nothing that
+should compromise our posterior computation.
+
+```{r}
+diagnostics <- util$extract_hmc_diagnostics(fit)
+util$check_all_hmc_diagnostics(diagnostics)
+
+samples <- util$extract_expectand_vals(fit)
+base_samples <- util$filter_expectands(samples,
+                                       c('alpha',
+                                         'eta_off',
+                                         'eta_def',
+                                         'gamma0',
+                                         'delta_off_free',
+                                         'delta_def_free'),
+                                       check_arrays=TRUE)
+util$check_all_expectand_diagnostics(base_samples)
+```
+
+It looks like this model expansion has done the trick.  Specifically the
+posterior predictive behaviors now exhibit the same skewness as the
+observed behaviors.
+
+```{r}
+par(mfrow=c(1, 2), mar=c(5, 5, 1, 1))
+
+util$plot_hist_quantiles(samples, 'y_home_pred', 0, 160, 5,
+                         baseline_values=data$y_home,
+                         xlab="Home Score")
+
+util$plot_hist_quantiles(samples, 'y_away_pred', 0, 160, 5,
+                         baseline_values=data$y_away,
+                         xlab="Away Score")
+
+```
+
+```{r}
+par(mfrow=c(2, 1), mar=c(5, 5, 1, 1))
+
+util$plot_hist_quantiles(samples, 'y_diff_pred', -80, 120, 10,
+                         baseline_values=data$y_home - data$y_away,
+                         xlab="Home Score - Away Score")
+
+util$plot_hist_quantiles(samples, 'y_sum_pred', 50, 230, 5,
+                         baseline_values=data$y_home + data$y_away,
+                         xlab="Home Score + Away Score")
+```
+
+The retrodictive agreement also persists across the season.
+
+```{r}
+par(mfrow=c(3, 1), mar=c(5, 5, 3, 1))
+
+names <- sapply(1:120, function(n) paste0('y_diff_pred[', n, ']'))
+filt_samples <- lapply(names, function(n) samples[[n]])
+names(filt_samples) <- names
+util$plot_hist_quantiles(filt_samples, 'y_diff_pred', -80, 120, 10,
+                         baseline_values=data$y_home[1:120] -
+                                         data$y_away[1:120],
+                         xlab="Home Score - Away Score",
+                         main="First Third of Season")
+
+names <- lapply(121:240, function(n) paste0('y_diff_pred[', n, ']'))
+filt_samples <- lapply(names, function(n) samples[[n]])
+names(filt_samples) <- names
+
+util$plot_hist_quantiles(filt_samples, 'y_diff_pred', -80, 120, 10,
+                         baseline_values=data$y_home[121:240] -
+                                         data$y_away[121:240],
+                         xlab="Home Score - Away Score",
+                         main="Middle Third of Season")
+
+names <- lapply(241:360, function(n) paste0('y_diff_pred[', n, ']'))
+filt_samples <- lapply(names, function(n) samples[[n]])
+names(filt_samples) <- names
+
+util$plot_hist_quantiles(filt_samples, 'y_diff_pred', -80, 120, 10,
+                         baseline_values=data$y_home[241:360] -
+                                         data$y_away[241:360],
+                         xlab="Home Score - Away Score",
+                         main="Final Third of Season")
+```
+
+Because our model appears to be adequate, at least in the context of
+these particular retrodictive checks, we can examine the resulting
+posterior inferences to see what we've learned about the teams.
+
+Firstly we have the baseline behavior which appears to be reasonably
+well-informed by the observed games.
+
+```{r}
+par(mfrow=c(1, 1), mar=c(5, 5, 1, 1))
+
+util$plot_expectand_pushforward(samples[['alpha']], 25,
+                                baseline_col=util$c_dark_teal,
+                                display_name="Baseline Log Score")
+```
+
+Our inferences preclude negative home-field advantages in favor of
+moderately positive values.
+
+```{r}
+par(mfrow=c(1, 2), mar=c(5, 5, 1, 1))
+
+title <- "Offensive Home-Field Advantage"
+util$plot_expectand_pushforward(samples[['eta_off']], 25,
+                                baseline_col=util$c_dark_teal,
+                                display_name=title)
+
+title <- "Defensive Home-Field Advantage"
+util$plot_expectand_pushforward(samples[['eta_def']], 25,
+                                baseline_col=util$c_dark_teal,
+                                display_name=title)
+```
+
+The baseline discrimination is close to zero, but small enough that by
+the end of the season the scores are substantially less sensitive to the
+team skills.
+
+```{r}
+par(mfrow=c(1, 1), mar=c(5, 5, 1, 1))
+
+util$plot_expectand_pushforward(samples[['gamma0']], 25,
+                                baseline_col=util$c_dark_teal,
+                                display_name="Discrimination Exponent")
+```
+
+Speaking of team skills, the inferred offensive and defensive skills
+allow us to compare the performance of each team to each other.
+
+```{r}
+par(mfrow=c(2, 1), mar=c(5, 5, 1, 1))
+
+names <- sapply(1:data$N_teams,
+                function(i) paste0('delta_off[', i, ']'))
+util$plot_disc_pushforward_quantiles(samples, names,
+                                     xlab="Team",
+                                     ylab="Relative Offensive Skill")
+
+names <- sapply(1:data$N_teams,
+                function(i) paste0('delta_def[', i, ']'))
+util$plot_disc_pushforward_quantiles(samples, names,
+                                     xlab="Team",
+                                     ylab="Relative Defensive Skill")
+```
+
+For example we can see that Team 5 features a strong offense but a
+mediocre defense.  On the other hand Team 7 enjoys the strongest defense
+but a subpar offensive.  The offensive skill of the anchor team is worse
+than that of all of the other teams, but their defensive skill is in the
+middle of the pack.
+
+### Informing Betting Decisions
+
+Another use of these posterior inferences is to predict the outcomes of
+games that have not yet been played.  Even more we can use those
+predictions to inform decisions about those future games, such as how to
+best gamble on them.
+
+Let's say that immediately after the season ends a playoff beings with
+the four teams at the top of the standings playing each other in the
+first round.  Specifically the fourth place team travels to play the
+first place team, and the third place team travels to play the second
+place team.
+
+```{r}
+wins <- rep(0, data$N_teams)
+ties <- rep(0, data$N_teams)
+losses <- rep(0, data$N_teams)
+
+for (n in 1:data$N_games) {
+  if (data$y_home[n] > data$y_away[n]) {
+    wins[data$home_idx[n]] <- wins[data$home_idx[n]] + 1
+    losses[data$away_idx[n]] <- losses[data$away_idx[n]] + 1
+  } else if (data$y_home[n] < data$y_away[n]) {
+    losses[data$home_idx[n]] <- losses[data$home_idx[n]] + 1
+    wins[data$away_idx[n]] <- wins[data$away_idx[n]] + 1
+  } else if (data$y_home[n] == data$y_away[n]) {
+    ties[data$home_idx[n]] <- ties[data$home_idx[n]] + 1
+    ties[data$away_idx[n]] <- ties[data$away_idx[n]] + 1
+  }
+}
+
+standings <- data.frame(1:data$N_teams, wins, losses, ties)
+names(standings) <- c("Team", "Wins", "Losses", "Ties")
+
+print(standings[rev(order(wins, ties)),], row.names=FALSE)
+```
+
+At the top of the season standings we have
+- First Place: Team 8,
+- Second Place: Team 9,
+- Third Place: Team 7,
+- Fourth Place: Team 5.
+
+Consequently the first round of the playoffs would consist of the two
+games
+- Team 8 (Home) vs Team 5 (Away),
+- Team 9 (Home) vs Team 7 (Away).
+
+Many sporting events feature a variety of outcomes on which individuals
+can gamble, but here we'll focus on the score differentials.
+
+For example we might have an opportunity to bet on the outcome of the
+first game with Team 8 giving 21 points to Team 5.  This means that
+we're not betting on whether or not Team 8 defeats Team 5 but rather
+whether or not they beat Team 5 by more than 21 points.
+
+More formally we might have an available gamble defined such that we can
+bet 110 units of currency and then win back our bet plus 100 units if
+$$
+y_{8,5} > y_{5,8} + 21
+$$
+but lose the 110 units if
+$$
+y_{8,5} \le y_{5,8} + 21.
+$$.
+Similarly we might be able to bet 110 units of currency and then win
+back our bet plus 100 units if
+$$
+y_{8,5} < y_{5,8} + 21
+$$
+but again lose the 110 unit bet if
+$$
+y_{8,5} \le y_{5,8} + 21.
+$$
+
+These available then define a decision making problem.  We have three
+actions that we can take --  bet that the score differential of the
+first game will be larger than 21, bet that it will be less than 21, and
+not bet at all -- with associated utilities that depend on the unknown
+game outcome.  Reasoning about all of these possibilities is a bit
+easier if we organize all of this information into a table
+(@tbl-game-one-bets).
+
+::: { #tbl-game-one-bets .striped }
+
+| Outcome | [$y_{8,5} > y_{5,8} + 21$]{style="text-transform:none;"} | [$y_{8,5} < y_{5,8} + 21$]{style="text-transform:none;"} | [$y_{8,5} = y_{5,8} + 21$]{style="text-transform:none;"} |
+|-|------|-----|
+| **Action 1** | +100 | -110 | -110 |
+| **Action 2** | -110 | +100 | -110 |
+| **Action 3** | 0    | 0    | 0    |
+
+Bets on the winner of a game define a decision making problem.
+Inferences about the skills of the competing teams can be used to
+inform the best possible decisions.
+
+:::
+
+Notice the asymmetry in what we have to bet verses what we might be able
+to win in each bet.  Moreover note that ties are excluded from either
+winning condition.  The house, as they say, always wins.
+
+Once we have established the viable actions and their potential
+utilities we can use the evaluate posterior predictive expected
+utilities,
+\begin{align*}
+U_{1}
+&=
+  100 \, \pi( \{ y_{8,5} >   y_{5,8} + 21 \} )
+- 110 \, \pi( \{ y_{8,5} \le y_{5,8} + 21 \} )
+\\
+&=
+  100 \, \pi( \{ y_{8,5} > y_{5,8} + 21 \} )
+- 110 \, (1 - \pi( \{ y_{8,5} > y_{5,8} + 21 \} ) )
+\\
+U_{2}
+&=
+ -110 \, \pi( \{ y_{8,5} \ge y_{5,8} + 21 \} )
++ 100 \, \pi( \{ y_{8,5} <   y_{5,8} + 21 \} )
+\\
+&=
+ 100 \, \pi( \{ y_{8,5} < y_{5,8} + 21 \} )
+-110 \, (1 - \pi( \{ y_{8,5} < y_{5,8} + 21 \} ) )
+\\
+U_{3}
+&=
+0.
+\end{align*}
+
+
+For the second game the available bets give 11 points to Team 5
+(@tbl-game-two-bets).
+
+::: { #tbl-game-two-bets .striped }
+
+| Outcome | [$y_{9,7} > y_{7,9} + 11$]{style="text-transform:none;"} | [$y_{9,7} < y_{7,9} + 11$]{style="text-transform:none;"} | [$y_{9,7} = y_{7,9} + 11$]{style="text-transform:none;"} |
+|-|------|-----|
+| **Action 1** | +100 | -110 | -110 |
+| **Action 2** | -110 | +100 | -110 |
+| **Action 3** | 0    | 0    | 0    |
+
+The point spread for the second game define another decision making
+problem.
+
+:::
+
+All we have to do now is estimate the posterior predictive probability
+allocated to the various game outcomes.  Fortunately this is
+straightforward with Markov chain Monte Carlo.
+
+```{r}
+data$N_playoff_games <- 2
+data$playoff_home_idx <- c(8, 5)
+data$playoff_away_idx <- c(9, 7)
+data$playoff_week <- c(data$N_weeks + 1, data$N_weeks + 1)
+```
+
+```{.stan include="stan_programs/season3_playoff.stan" filename="season3_playoff.stan"}
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| cache: true
+fit <- stan(file="stan_programs/season3_playoff.stan",
+            data=data, seed=8438338,
+            warmup=1000, iter=2024, refresh=0)
+```
+
+Fortunately the diagnostics remain clean.
+
+```{r}
+diagnostics <- util$extract_hmc_diagnostics(fit)
+util$check_all_hmc_diagnostics(diagnostics)
+
+samples <- util$extract_expectand_vals(fit)
+base_samples <- util$filter_expectands(samples,
+                                       c('alpha',
+                                         'eta_off',
+                                         'eta_def',
+                                         'gamma0',
+                                         'delta_off_free',
+                                         'delta_def_free'),
+                                       check_arrays=TRUE)
+util$check_all_expectand_diagnostics(base_samples)
+```
+
+Let's start with the first game.  First we estimate the posterior
+predictive probabilities.
+
+```{r}
+g1_p_home_spread <-
+  util$implicit_subset_prob(samples,
+                            function(yh, ya) yh > ya + 21,
+                            list('yh' = 'y_home_playoff_pred[1]',
+                                 'ya' = 'y_away_playoff_pred[1]'))
+
+g1_p_away_spread <-
+  util$implicit_subset_prob(samples,
+                            function(yh, ya) yh < ya + 21,
+                            list('yh' = 'y_home_playoff_pred[1]',
+                                 'ya' = 'y_away_playoff_pred[1]'))
+```
+
+Then we compute the expected utilities for each bet.
+
+```{r}
+m3_g1_U1 <- g1_p_home_spread[1] * 100 +
+            (1 - g1_p_home_spread[1]) * (-110)
+m3_g1_U2 <- g1_p_away_spread[1] * 100 +
+            (1 - g1_p_away_spread[1]) * (-110)
+```
+
+Finally we can do the same for the second game.
+
+```{r}
+g2_p_home_spread <-
+  util$implicit_subset_prob(samples,
+                            function(yh, ya) yh > ya + 11,
+                            list('yh' = 'y_home_playoff_pred[2]',
+                                 'ya' = 'y_away_playoff_pred[2]'))
+
+g2_p_away_spread <-
+  util$implicit_subset_prob(samples,
+                            function(yh, ya) yh < ya + 11,
+                            list('yh' = 'y_home_playoff_pred[2]',
+                                 'ya' = 'y_away_playoff_pred[2]'))
+```
+
+```{r}
+m3_g2_U1 <- g2_p_home_spread[1] * 100 +
+            (1 - g2_p_home_spread[1]) * (-110)
+m3_g2_U2 <- g2_p_away_spread[1] * 100 +
+            (1 - g2_p_away_spread[1]) * (-110)
+```
+
+Putting everything together allows us to compare the potential winnings
+of the two bets, as well as the third option to not bet and just enjoy
+the game risk-free.
+
+```{r}
+expected_winnings <- data.frame(c(paste("Team 8 (Home)      Defeats",
+                                        "Team 5 (Away) + 21"),
+                                  paste("Team 5 (Away) + 21 Defeats",
+                                        "Team 8 (Home)    "),
+                                  paste("Team 9 (Home)      Defeats",
+                                        "Team 7 (Away) + 11"),
+                                  paste("Team 7 (Away) + 11 Defeats",
+                                        "Team 9 (Home)    ")),
+                                c(m1_g1_U1, m1_g1_U2,
+                                  m1_g2_U1, m1_g2_U2))
+names(expected_winnings) <- c("Bet", "Expected Winnings")
+
+print(expected_winnings, row.names=FALSE, right=FALSE)
+```
+
+Based on our inferences, which in turn are based on our modeling
+assumptions and the observed data, the only profitable bet here is to
+take Team 5 and the points in the first playoff game.
+
+What if we had ignored retrodictive performance and stuck with our first
+model?  Well we can just calculate how the expected utilities would have
+been informed by those unreliable inferences.
+
+```{.stan include="stan_programs/season1_playoff.stan" filename="season1_playoff.stan"}
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| cache: true
+fit <- stan(file="stan_programs/season1_playoff.stan",
+            data=data, seed=8438338,
+            warmup=1000, iter=2024, refresh=0)
+```
+
+There are no computational concerns.
+
+```{r}
+diagnostics <- util$extract_hmc_diagnostics(fit)
+util$check_all_hmc_diagnostics(diagnostics)
+
+samples <- util$extract_expectand_vals(fit)
+base_samples <- util$filter_expectands(samples,
+                                       c('alpha',
+                                         'delta_off_free',
+                                         'delta_def_free'),
+                                       check_arrays=TRUE)
+util$check_all_expectand_diagnostics(base_samples)
+```
+
+The calculation of the expected utilities proceeds the same as before.
+
+```{r}
+g1_p_home_spread <-
+  util$implicit_subset_prob(samples,
+                            function(yh, ya) yh > ya + 21,
+                            list('yh' = 'y_home_playoff_pred[1]',
+                                 'ya' = 'y_away_playoff_pred[1]'))
+
+g1_p_away_spread <-
+  util$implicit_subset_prob(samples,
+                            function(yh, ya) yh < ya + 21,
+                            list('yh' = 'y_home_playoff_pred[1]',
+                                 'ya' = 'y_away_playoff_pred[1]'))
+
+m1_g1_U1 <- g1_p_home_spread[1] * 100 +
+            (1 - g1_p_home_spread[1]) * (-110)
+m1_g1_U2 <- g1_p_away_spread[1] * 100 +
+            (1 - g1_p_away_spread[1]) * (-110)
+```
+
+```{r}
+g2_p_home_spread <-
+  util$implicit_subset_prob(samples,
+                            function(yh, ya) yh > ya + 11,
+                            list('yh' = 'y_home_playoff_pred[2]',
+                                 'ya' = 'y_away_playoff_pred[2]'))
+
+g2_p_away_spread <-
+  util$implicit_subset_prob(samples,
+                            function(yh, ya) yh < ya + 11,
+                            list('yh' = 'y_home_playoff_pred[2]',
+                                 'ya' = 'y_away_playoff_pred[2]'))
+
+m1_g2_U1 <- g2_p_home_spread[1] * 100 +
+            (1 - g2_p_home_spread[1]) * (-110)
+m1_g2_U2 <- g2_p_away_spread[1] * 100 +
+            (1 - g2_p_away_spread[1]) * (-110)
+```
+
+Now we can directly compare the optimal decisions according to the two
+models.
+
+```{r}
+expected_winnings <- data.frame(c(paste("Team 8 (Home)      Defeats",
+                                        "Team 5 (Away) + 21"),
+                                  paste("Team 5 (Away) + 21 Defeats",
+                                        "Team 8 (Home)    "),
+                                  paste("Team 9 (Home)      Defeats",
+                                        "Team 7 (Away) + 11"),
+                                  paste("Team 7 (Away) + 11 Defeats",
+                                        "Team 9 (Home)    ")),
+                                c(m1_g1_U1, m1_g1_U2,
+                                  m1_g2_U1, m1_g2_U2),
+                                c(m3_g1_U1, m3_g1_U2,
+                                  m3_g2_U1, m3_g2_U2))
+names(expected_winnings) <- c("Bet",
+                              "Expected Winnings (M1)",
+                              "Expected Winnings (M3)")
+
+print(expected_winnings, row.names=FALSE, right=FALSE)
+```
+
+The magnitude of the expected utilities from the first model are quite a
+bit larger that the expected utilities from the third model.  Moreover
+according to the first model both away bets would be pretty strongly
+profitable.  If we used this model we might have been tempted to make a
+bad bet on the away team in game 2!
+
+Bayesian decision theory is a powerful tool, but it is only as reliable
+as the posterior inferences and the reliability of the posterior
+inferences is limited by the adequacy of the modeling assumptions.
+
+# Conclusion
+
+Once we start looking for pairwise comparisons we tend to start seeing
+them in application after application.  Even if a data generating
+process doesn't fully manifest as a pairwise comparison, parts of it
+might.  The general modeling techniques presented in this chapter allow
+us to appropriately model pairwise comparisons whenever they might
+appear.
+
+That said these techniques are very much just a stable foundation, and
+they can be extended and combined with other techniques to develop even
+more sophisticated models.  For example instead of treating item
+qualities as individual parameters to infer we can sometimes derive
+them from other parts of a model including as the output of some
+function of item properties.  In a sports application we could model
+the offensive skill of a team as a combination of individual player
+skills and even coaching skills.  Similarly we might model the ability
+of a student to correctly answer a test question as a function of their
+cumulative study efforts.
+
+Finally we have to take care when comparing multiple items at the same
+time as many of the pairwise modeling techniques don't immediately
+generalize.  One common approach to modeling the comparison of multiple
+items is to break to observed ranks down into a sequence of
+one-verses-all comparisons, with the first comparison determining first
+place, the second determining second place, and so on **ref**.
+
+# Acknowledgements {-}
+
+A very special thanks to everyone supporting me on Patreon: 
+
+# License {-}
+
+A repository containing all of the files used to generate this chapter
+is available on [GitHub](
+https://github.com/betanalpha/quarto_modeling_techniques/tree/main/pairwise_comparison_modeling).
+
+The code in this case study is copyrighted by Michael Betancourt and
+licensed under the new BSD (3-clause) license:
+
+[https://opensource.org/licenses/BSD-3-Clause](https://opensource.org/licenses/BSD-3-Clause)
+
+The text and figures in this chapter are copyrighted by Michael Betancourt
+and licensed under the CC BY-NC 4.0 license:
+
+[https://creativecommons.org/licenses/by-nc/4.0/](https://creativecommons.org/licenses/by-nc/4.0/)
+
+# Original Computing Environment {-}
+
+```{r, comment=NA}
+writeLines(readLines(file.path(Sys.getenv("HOME"), ".R/Makevars")))
+```
+
+```{r, comment=NA}
+sessionInfo()
+```
+
