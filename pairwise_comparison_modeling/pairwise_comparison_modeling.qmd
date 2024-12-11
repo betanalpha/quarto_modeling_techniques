@@ -520,10 +520,11 @@ correct answer probabilities,
 $$
 p_{ji}
 =
-\mathrm{logistic}\big(
   \lambda_{i}
 + (1 - \lambda_{i}) \cdot
-  \gamma_{i} \cdot (\alpha_{j} - \beta_{i} ) \big).
+  \mathrm{logistic} \big(
+    \gamma_{i} \cdot (\alpha_{j} - \beta_{i} )
+  \big).
 $$
 As we saw in the
 [mixture modeling chapter](https://betanalpha.github.io/assets/chapters_html/mixture_modeling.html#categorical-and-multinomial-mixture-models)
@@ -532,7 +533,7 @@ interpreted as a mixture of separate Bernoulli models,
 \begin{align*}
 p(y_{ji})
 &=
-\quad \lambda_{i} \, \text{Bernoulli}(y_{ji} \mid 1)
+\quad\quad\quad\; \lambda_{i} \, \text{Bernoulli}(y_{ji} \mid 1)
 \\
 &\quad +
 (1 - \lambda_{i}) \,
@@ -663,8 +664,8 @@ After this transformation the item quality differences are unchanged,
 &=
 \mu_{i_{1} i_{2}}( \alpha_{i_{1}} - \alpha_{i'},
                    \alpha_{i_{2}} - \alpha_{i'} )
-&=
 \\
+&=
 f \big(  (\alpha_{i_{1}} - \alpha_{i'})
        - (\alpha_{i_{2}} - \alpha_{i'}) \big)
 \\
@@ -759,7 +760,7 @@ historical competition data we can learn how skilled more modern
 competitors are to older competitors only if we have enough
 intermediate competitions to bridge them together.
 
-## Coupling Functions Redundancies
+## Coupling Function Redundancies
 
 Every function that couples the item quality differences to the outcome
 location will suffer the fundamental redundancy of the item qualities.
@@ -825,8 +826,8 @@ $$
 p(y_{ij} ) =
 \mathrm{Poisson}\big( y_{ij} \mid
                       \exp(  \eta
-                           + \alpha_{i}^{\mathrm{offense}})
-                           - \alpha_{j}^{\mathrm{defense}})
+                           + \alpha_{i}^{\mathrm{offense}}
+                           - \alpha_{j}^{\mathrm{defense}}
                           )
                 \big)
 $$
@@ -1206,7 +1207,7 @@ connected components.
 
 Given an initial node we first find all of the nodes that are at least
 indirectly related by pairwise comparisons with a recursive,
-breadth-first search **Knuth ref**.
+breadth-first search.
 
 ```{r}
 breadth_first_search <- function(n, adj, local_nodes=c()) {
@@ -2218,7 +2219,7 @@ sum_vals <- util$eval_expectand_pushforward(samples,
                                             function(delta) sum(delta),
                                             var_repl)
 util$plot_expectand_pushforward(sum_vals, 100, flim=c(-40, 40),
-                                display_name="sum(alpha)",
+                                display_name="sum(delta)",
                                 main="Connected Component 1")
 
 xs <- seq(-40, 40, 0.01)
@@ -2232,7 +2233,7 @@ sum_vals <- util$eval_expectand_pushforward(samples,
                                             function(delta) sum(delta),
                                             var_repl)
 util$plot_expectand_pushforward(sum_vals, 20, flim=c(-40, 40),
-                                display_name="sum(alpha)",
+                                display_name="sum(delta)",
                                 main="Connected Component 2")
 
 xs <- seq(-40, 40, 0.01)
@@ -2423,7 +2424,7 @@ sum_vals <- util$eval_expectand_pushforward(samples,
                                             function(delta) sum(delta),
                                             var_repl)
 util$plot_expectand_pushforward(sum_vals, 30, flim=c(-1, 3),
-                                display_name="sum(alpha)",
+                                display_name="sum(delta)",
                                 main="Connected Component 1")
 
 xs <- seq(-3, 3, 0.01)
@@ -2437,7 +2438,7 @@ sum_vals <- util$eval_expectand_pushforward(samples,
                                             function(delta) sum(delta),
                                             var_repl)
 util$plot_expectand_pushforward(sum_vals, 30, flim=c(-1, 3),
-                                display_name="sum(alpha)",
+                                display_name="sum(delta)",
                                 main="Connected Component 2")
 
 xs <- seq(-3, 3, 0.01)
@@ -2916,14 +2917,16 @@ par(mfrow=c(2, 1), mar=c(5, 5, 1, 1))
 names <- sapply(1:data$N_questions,
                 function(i) paste0('gamma[', i, ']'))
 util$plot_disc_pushforward_quantiles(samples, names,
-                                     xlab="Item", ylab="Discrimination")
+                                     xlab="Question",
+                                     ylab="Discrimination")
 abline(v=50.5, lty=2, col="#DDDDDD")
 abline(v=100.5, lty=2, col="#DDDDDD")
 
 names <- sapply(1:data$N_questions,
                 function(i) paste0('beta[', i, ']'))
 util$plot_disc_pushforward_quantiles(samples, names,
-                                     xlab="Item", ylab="Difficulty")
+                                     xlab="Question",
+                                     ylab="Difficulty")
 abline(v=50.5, lty=2, col="#DDDDDD")
 abline(v=100.5, lty=2, col="#DDDDDD")
 ```
@@ -3598,7 +3601,7 @@ discrimination variable that evolves with time,
 \begin{align*}
 \lambda_{i_{1} i_{2}}
 &=
-\exp \big(   \alpha + \eta^{\mathrm{off}} \big)
+\exp \big(   \alpha + \eta^{\mathrm{off}}
            + \gamma(t) \cdot
                \big(  \delta_{i_{1}}^{\mathrm{off}}
                     - \delta_{i_{2}}^{\mathrm{def}} \big)
@@ -3606,7 +3609,7 @@ discrimination variable that evolves with time,
 \\
 \lambda_{i_{2} i_{1}}
 &=
-\exp \big(   \alpha - \eta^{\mathrm{def}} \big)
+\exp \big(   \alpha - \eta^{\mathrm{def}}
            + \gamma(t) \cdot
                \big(  \delta_{i_{2}}^{\mathrm{off}}
                     - \delta_{i_{1}}^{\mathrm{def}} \big)

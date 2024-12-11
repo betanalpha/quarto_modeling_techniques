@@ -668,10 +668,11 @@ Lastly a 3PL model for each question introduces lower bounds to the
 correct answer probabilities, \[
 p_{ji}
 =
-\mathrm{logistic}\big(
   \lambda_{i}
 + (1 - \lambda_{i}) \cdot
-  \gamma_{i} \cdot (\alpha_{j} - \beta_{i} ) \big).
+  \mathrm{logistic} \big(
+    \gamma_{i} \cdot (\alpha_{j} - \beta_{i} )
+  \big).
 \] As we saw in the
 \href{https://betanalpha.github.io/assets/chapters_html/mixture_modeling.html\#categorical-and-multinomial-mixture-models}{mixture
 modeling chapter} this mixture of Bernoulli probability configurations
@@ -679,7 +680,7 @@ can also be interpreted as a mixture of separate Bernoulli models,
 \begin{align*}
 p(y_{ji})
 &=
-\quad \lambda_{i} \, \text{Bernoulli}(y_{ji} \mid 1)
+\quad\quad\quad\; \lambda_{i} \, \text{Bernoulli}(y_{ji} \mid 1)
 \\
 &\quad +
 (1 - \lambda_{i}) \,
@@ -838,8 +839,8 @@ distinguished item quality from all of the item qualities, \[
 &=
 \mu_{i_{1} i_{2}}( \alpha_{i_{1}} - \alpha_{i'},
                    \alpha_{i_{2}} - \alpha_{i'} )
-&=
 \\
+&=
 f \big(  (\alpha_{i_{1}} - \alpha_{i'})
        - (\alpha_{i_{2}} - \alpha_{i'}) \big)
 \\
@@ -980,8 +981,8 @@ when analyzing historical competition data we can learn how skilled more
 modern competitors are to older competitors only if we have enough
 intermediate competitions to bridge them together.
 
-\subsection{Coupling Functions
-Redundancies}\label{coupling-functions-redundancies}
+\subsection{Coupling Function
+Redundancies}\label{coupling-function-redundancies}
 
 Every function that couples the item quality differences to the outcome
 location will suffer the fundamental redundancy of the item qualities.
@@ -1041,8 +1042,8 @@ league as \[
 p(y_{ij} ) =
 \mathrm{Poisson}\big( y_{ij} \mid
                       \exp(  \eta
-                           + \alpha_{i}^{\mathrm{offense}})
-                           - \alpha_{j}^{\mathrm{defense}})
+                           + \alpha_{i}^{\mathrm{offense}}
+                           - \alpha_{j}^{\mathrm{defense}}
                           )
                 \big)
 \] then we would need to anchor one team's offensive skill to zero and
@@ -1390,7 +1391,7 @@ connected components.
 
 Given an initial node we first find all of the nodes that are at least
 indirectly related by pairwise comparisons with a recursive,
-breadth-first search \textbf{Knuth ref}.
+breadth-first search.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -2983,7 +2984,7 @@ in the other component is informed mostly by the prior model.
                                             \ControlFlowTok{function}\NormalTok{(delta) }\FunctionTok{sum}\NormalTok{(delta),}
 \NormalTok{                                            var\_repl)}
 \NormalTok{util}\SpecialCharTok{$}\FunctionTok{plot\_expectand\_pushforward}\NormalTok{(sum\_vals, }\DecValTok{100}\NormalTok{, }\AttributeTok{flim=}\FunctionTok{c}\NormalTok{(}\SpecialCharTok{{-}}\DecValTok{40}\NormalTok{, }\DecValTok{40}\NormalTok{),}
-                                \AttributeTok{display\_name=}\StringTok{"sum(alpha)"}\NormalTok{,}
+                                \AttributeTok{display\_name=}\StringTok{"sum(delta)"}\NormalTok{,}
                                 \AttributeTok{main=}\StringTok{"Connected Component 1"}\NormalTok{)}
 
 \NormalTok{xs }\OtherTok{\textless{}{-}} \FunctionTok{seq}\NormalTok{(}\SpecialCharTok{{-}}\DecValTok{40}\NormalTok{, }\DecValTok{40}\NormalTok{, }\FloatTok{0.01}\NormalTok{)}
@@ -2997,7 +2998,7 @@ in the other component is informed mostly by the prior model.
                                             \ControlFlowTok{function}\NormalTok{(delta) }\FunctionTok{sum}\NormalTok{(delta),}
 \NormalTok{                                            var\_repl)}
 \NormalTok{util}\SpecialCharTok{$}\FunctionTok{plot\_expectand\_pushforward}\NormalTok{(sum\_vals, }\DecValTok{20}\NormalTok{, }\AttributeTok{flim=}\FunctionTok{c}\NormalTok{(}\SpecialCharTok{{-}}\DecValTok{40}\NormalTok{, }\DecValTok{40}\NormalTok{),}
-                                \AttributeTok{display\_name=}\StringTok{"sum(alpha)"}\NormalTok{,}
+                                \AttributeTok{display\_name=}\StringTok{"sum(delta)"}\NormalTok{,}
                                 \AttributeTok{main=}\StringTok{"Connected Component 2"}\NormalTok{)}
 
 \NormalTok{xs }\OtherTok{\textless{}{-}} \FunctionTok{seq}\NormalTok{(}\SpecialCharTok{{-}}\DecValTok{40}\NormalTok{, }\DecValTok{40}\NormalTok{, }\FloatTok{0.01}\NormalTok{)}
@@ -3320,7 +3321,7 @@ well.
                                             \ControlFlowTok{function}\NormalTok{(delta) }\FunctionTok{sum}\NormalTok{(delta),}
 \NormalTok{                                            var\_repl)}
 \NormalTok{util}\SpecialCharTok{$}\FunctionTok{plot\_expectand\_pushforward}\NormalTok{(sum\_vals, }\DecValTok{30}\NormalTok{, }\AttributeTok{flim=}\FunctionTok{c}\NormalTok{(}\SpecialCharTok{{-}}\DecValTok{1}\NormalTok{, }\DecValTok{3}\NormalTok{),}
-                                \AttributeTok{display\_name=}\StringTok{"sum(alpha)"}\NormalTok{,}
+                                \AttributeTok{display\_name=}\StringTok{"sum(delta)"}\NormalTok{,}
                                 \AttributeTok{main=}\StringTok{"Connected Component 1"}\NormalTok{)}
 
 \NormalTok{xs }\OtherTok{\textless{}{-}} \FunctionTok{seq}\NormalTok{(}\SpecialCharTok{{-}}\DecValTok{3}\NormalTok{, }\DecValTok{3}\NormalTok{, }\FloatTok{0.01}\NormalTok{)}
@@ -3334,7 +3335,7 @@ well.
                                             \ControlFlowTok{function}\NormalTok{(delta) }\FunctionTok{sum}\NormalTok{(delta),}
 \NormalTok{                                            var\_repl)}
 \NormalTok{util}\SpecialCharTok{$}\FunctionTok{plot\_expectand\_pushforward}\NormalTok{(sum\_vals, }\DecValTok{30}\NormalTok{, }\AttributeTok{flim=}\FunctionTok{c}\NormalTok{(}\SpecialCharTok{{-}}\DecValTok{1}\NormalTok{, }\DecValTok{3}\NormalTok{),}
-                                \AttributeTok{display\_name=}\StringTok{"sum(alpha)"}\NormalTok{,}
+                                \AttributeTok{display\_name=}\StringTok{"sum(delta)"}\NormalTok{,}
                                 \AttributeTok{main=}\StringTok{"Connected Component 2"}\NormalTok{)}
 
 \NormalTok{xs }\OtherTok{\textless{}{-}} \FunctionTok{seq}\NormalTok{(}\SpecialCharTok{{-}}\DecValTok{3}\NormalTok{, }\DecValTok{3}\NormalTok{, }\FloatTok{0.01}\NormalTok{)}
@@ -4093,14 +4094,16 @@ difficult.
 \NormalTok{names }\OtherTok{\textless{}{-}} \FunctionTok{sapply}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\NormalTok{data}\SpecialCharTok{$}\NormalTok{N\_questions,}
                 \ControlFlowTok{function}\NormalTok{(i) }\FunctionTok{paste0}\NormalTok{(}\StringTok{\textquotesingle{}gamma[\textquotesingle{}}\NormalTok{, i, }\StringTok{\textquotesingle{}]\textquotesingle{}}\NormalTok{))}
 \NormalTok{util}\SpecialCharTok{$}\FunctionTok{plot\_disc\_pushforward\_quantiles}\NormalTok{(samples, names,}
-                                     \AttributeTok{xlab=}\StringTok{"Item"}\NormalTok{, }\AttributeTok{ylab=}\StringTok{"Discrimination"}\NormalTok{)}
+                                     \AttributeTok{xlab=}\StringTok{"Question"}\NormalTok{,}
+                                     \AttributeTok{ylab=}\StringTok{"Discrimination"}\NormalTok{)}
 \FunctionTok{abline}\NormalTok{(}\AttributeTok{v=}\FloatTok{50.5}\NormalTok{, }\AttributeTok{lty=}\DecValTok{2}\NormalTok{, }\AttributeTok{col=}\StringTok{"\#DDDDDD"}\NormalTok{)}
 \FunctionTok{abline}\NormalTok{(}\AttributeTok{v=}\FloatTok{100.5}\NormalTok{, }\AttributeTok{lty=}\DecValTok{2}\NormalTok{, }\AttributeTok{col=}\StringTok{"\#DDDDDD"}\NormalTok{)}
 
 \NormalTok{names }\OtherTok{\textless{}{-}} \FunctionTok{sapply}\NormalTok{(}\DecValTok{1}\SpecialCharTok{:}\NormalTok{data}\SpecialCharTok{$}\NormalTok{N\_questions,}
                 \ControlFlowTok{function}\NormalTok{(i) }\FunctionTok{paste0}\NormalTok{(}\StringTok{\textquotesingle{}beta[\textquotesingle{}}\NormalTok{, i, }\StringTok{\textquotesingle{}]\textquotesingle{}}\NormalTok{))}
 \NormalTok{util}\SpecialCharTok{$}\FunctionTok{plot\_disc\_pushforward\_quantiles}\NormalTok{(samples, names,}
-                                     \AttributeTok{xlab=}\StringTok{"Item"}\NormalTok{, }\AttributeTok{ylab=}\StringTok{"Difficulty"}\NormalTok{)}
+                                     \AttributeTok{xlab=}\StringTok{"Question"}\NormalTok{,}
+                                     \AttributeTok{ylab=}\StringTok{"Difficulty"}\NormalTok{)}
 \FunctionTok{abline}\NormalTok{(}\AttributeTok{v=}\FloatTok{50.5}\NormalTok{, }\AttributeTok{lty=}\DecValTok{2}\NormalTok{, }\AttributeTok{col=}\StringTok{"\#DDDDDD"}\NormalTok{)}
 \FunctionTok{abline}\NormalTok{(}\AttributeTok{v=}\FloatTok{100.5}\NormalTok{, }\AttributeTok{lty=}\DecValTok{2}\NormalTok{, }\AttributeTok{col=}\StringTok{"\#DDDDDD"}\NormalTok{)}
 \end{Highlighting}
@@ -5308,7 +5311,7 @@ We can incorporate this hypothesis into our model by adding a
 discrimination variable that evolves with time, \begin{align*}
 \lambda_{i_{1} i_{2}}
 &=
-\exp \big(   \alpha + \eta^{\mathrm{off}} \big)
+\exp \big(   \alpha + \eta^{\mathrm{off}}
            + \gamma(t) \cdot
                \big(  \delta_{i_{1}}^{\mathrm{off}}
                     - \delta_{i_{2}}^{\mathrm{def}} \big)
@@ -5316,7 +5319,7 @@ discrimination variable that evolves with time, \begin{align*}
 \\
 \lambda_{i_{2} i_{1}}
 &=
-\exp \big(   \alpha - \eta^{\mathrm{def}} \big)
+\exp \big(   \alpha - \eta^{\mathrm{def}}
            + \gamma(t) \cdot
                \big(  \delta_{i_{2}}^{\mathrm{off}}
                     - \delta_{i_{1}}^{\mathrm{def}} \big)
