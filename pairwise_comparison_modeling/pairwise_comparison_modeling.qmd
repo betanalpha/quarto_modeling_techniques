@@ -653,6 +653,8 @@ A more effective approach than prior containment is to remove a degree
 of freedom from the pairwise comparison model and eliminate the
 underlying redundancy entirely.
 
+### Single Anchor
+
 For example consider picking an arbitrary item and then subtracting the
 distinguished item quality from all of the item qualities,
 $$
@@ -686,9 +688,11 @@ The $\delta_{i}$ can be interpreted as the item qualities _relative_ to
 the quality of the anchored item, with $\delta_{i} > 0$ implying that
 the $i$th item is superior to the anchored item and $\delta_{i} < 0$
 implying that the $i$th item is inferior to the anchored item.  This
-direct interpretation also facilitates prior modeling, allowing us to
-reason about the relative item qualities directly instead of having to
-analyze pushforward behavior.
+interpretation also facilitates prior modeling, allowing us to reason
+about the relative item qualities directly instead of having to
+analyze indirect pushforward behavior.
+
+### Multiple Anchors
 
 All of this said, a single anchor isn't always enough.  Recall that once
 we fix the quality of the $i'$th item to zero the residual quality
@@ -696,19 +700,15 @@ parameters are interpreted relative to the quality of that anchored
 item.  This immediately identifies the $\delta_{i}$ for any item that is
 directly compared to the $i'$th item.  These identified parameters in
 turn identify any remaining items that are directly compared to them,
-and so on.
-
-Any items which are not at least indirectly compared to the anchored
-item, however, remain invariant to translations! In order to eliminate
-this remaining redundancy we need to anchor the quality of at least one
-more item.
+and so on.  Any items which are not at least indirectly compared to the
+anchored item, however, remain invariant to translations!
 
 We can formalize the connectivity of the comparisons, and hence how many
 item qualities we need to anchor, with a little bit of graph theory
-(@ClarkEtAl:1991).  Any set of observed pairwise comparisons define a
-graph, with each item defining a node and the number of pairwise
-comparisons between any two items defining a weighted, undirected edge
-between the corresponding nodes (@fig-graph).
+(@ClarkEtAl:1991).  Any collection of observed pairwise comparisons
+defines a graph, with each item defining a node and the number of
+pairwise comparisons between any two items defining a weighted,
+undirected edge between the corresponding nodes (@fig-graph).
 
 ![Any collection of pairwise comparisons defines an undirected graph,
 with the items being compared defining nodes and the comparisons
@@ -716,10 +716,11 @@ themselves defining edges between the nodes.](
 figures/graph/graph.png){
 width=50% #fig-graph}
 
-Two items have been directly or indirectly compared inform each other if
-their nodes can be connected by a path of edges.  More formally these
-interacting items form the connected subgraphs, or **components**, of
-the full graph (@fig-graph-decomposition).
+Two items have been directly compared if there is an edge between their
+nodes; two items have been indirectly compared if their nodes can be
+connected by a _path_ of edges.  More formally these interacting items
+form the connected subgraphs, or **components**, of the full graph
+(@fig-graph-decomposition).
 
 ::: {#fig-graph-decomposition layout="[-0.5, 33, 33, 33, -0.5]"}
 
@@ -737,28 +738,73 @@ independent of the item qualities in any other component.
 
 From an inferential perspective the behavior of items in one connected
 component are independent of the behavior of items in any other
-connected component.  In particular anchoring the quality parameter of
-an item eliminates the redundancy only of the item qualities within the
-same component.  The redundancy of item qualities in other components
-remains.
+connected component.  In other words the item qualities are only
+_locally_ interpretable within the encompassing connected component.  We
+cannot learn the relationship between two items that have no connection
+to each other!
 
-To completely eliminate the redundancy of a pairwise component model and
-avoid the subsequent inferential degeneracies we have to anchor one item
-quality _in each connected component_.  Fortunately the translation of a
-collection of items into a graph and computation of the resulting
-connected components is relatively straightforward to implement in
-practice (@CormenEtAl:2022).  We'll review a demonstration in
-[Section 6.2](#sec:graph-utils).
+For example while we can learn the relative test-taking abilities of
+students who taken the same test we cannot learn the relative
+test-taking abilities of students who have taken completely different
+tests.  Similarly when analyzing historical competition data we can
+learn how skilled more modern competitors are to older competitors only
+if we have enough intermediate competitions to bridge them together.
 
-Another consequence of these connectivity considerations is that the
-item qualities are only _locally_ interpretable within the encompassing
-connected component.  We cannot relate items that have no connection to
-each other!  For example while we can learn the relative test-taking
-abilities of students who take the same test we cannot compare students
-who have taken completely different tests.  Similarly when analyzing
-historical competition data we can learn how skilled more modern
-competitors are to older competitors only if we have enough
-intermediate competitions to bridge them together.
+Mathematically anchoring the quality parameter of an item eliminates the
+redundancy only of the item qualities within the same component.  The
+redundancy of item qualities in other components remains.  To completely
+eliminate the redundancy of a pairwise component model and avoid the
+subsequent inferential degeneracies we have to anchor one item quality
+_in each connected component_.
+
+Fortunately the translation of a collection of items into a graph and
+computation of the resulting connected components is relatively
+straightforward to implement in practice (@CormenEtAl:2022).  We'll
+review a demonstration in [Section 6.2](#sec:graph-utils).
+
+That said we have to be careful with what inferences we construct from a
+pairwise comparison model with more than one anchored item quality.  For
+example if we anchor the quality of items $i'$ and $i''$ in two
+different connected components then we will have both
+$$
+\delta_{i'} = \alpha_{i'} - \alpha_{i'} = 0
+$$
+and
+$$
+\delta_{i''} = \alpha_{i''} - \alpha_{i''} = 0,
+$$
+and consequently
+$$
+\delta_{i'} - \delta_{i''} = 0 - 0 = 0.
+$$
+Naively this might be interpreted as the quality of the two anchored
+items being identical, even thought those relative quantities are
+actually _incomparable_ with each other.
+
+In theory we could obstruct ill-defined comparisons by anchoring the
+items in the second connected component to a different value,
+\begin{align*}
+\delta_{i'} &= \alpha_{i'} - \alpha_{i'} = 0
+\\
+\delta_{i''} &= \alpha_{i''} - (\alpha_{i''} - \phi) = \phi.
+\end{align*}
+Unfortunately this just reintroduces the initial degeneracy: $\phi$ is
+completely uninformed by the observed data and we would have to rely on
+whatever domain expertise has been encoded in the prior model to inform
+its posterior behavior.
+
+Perhaps the safest approach is to simply analyze the pairwise
+comparisons in each connected components separately from each other.
+When analyzing a single connected component at a time we will only ever
+need to anchor one item.  Moreover inferences and predictions for all
+possible pairwise comparisons within each analysis will always be
+well-defined.  The limitation with this approach, however, is that the
+full data set will no longer able to inform any shared behaviors, such
+as common baselines or discriminations.
+
+Regardless of the approach we take _we_ are ultimately responsible for
+avoiding ill-defined inferences or predictions for any comparison of
+items in different connected components.
 
 ## Coupling Function Redundancies
 
@@ -2300,9 +2346,10 @@ mtext("Connected Component 2", line=-2, outer=TRUE)
 
 ### Attempt 5
 
-In order to completely eliminate the redundancy of this pairwise
-comparison model we need to anchor the skill of any one player in each
-component.
+We could avoid this residual degeneracy by splitting the data for each
+connected component and then analyzing each subset separately.
+Alternatively we can eliminate it by anchoring the skill of any one
+player in each component.
 
 ```{r}
 data$N_anchors <- 2
@@ -2363,8 +2410,8 @@ util$plot_disc_pushforward_quantiles(samples, names,
 
 Now the posterior inferences for all of the relative player skills are
 being dominated by the observed data.  Note that in order to compare
-these inference to the player skills used to simulate the data we need
-to account for both anchors.
+the inferred player skills to the simulation player skills we need to
+account for both anchors.
 
 ```{r}
 delta_true <- rep(NA, data$N_players)
@@ -2446,8 +2493,11 @@ ys <- dnorm(xs, 0, sqrt(length(components[[2]])) * sqrt(2) * 10 / 2.32)
 lines(xs, ys, lwd=2, col=util$c_light_teal)
 ```
 
-All the while the constraints on the difference in player skills remains
-the same.
+At the same time the constraints on the difference in player skills
+_within each connected component_ remains the same.  Now that we've
+anchored the skills in more than one connected component we have to take
+care to not mistakenly compare players from different components to each
+other.
 
 ```{r}
 par(mfrow=c(2, 3), mar=c(5, 5, 3, 1))
@@ -2511,7 +2561,8 @@ stronger prior model or anchored player skills is a substantial
 reduction in computational cost.  Between the two approaches the
 advantage of anchoring is that is requires only some careful
 programming, which we can always implement, and not abundant domain
-expertise, which is not always available.
+expertise, which is not always available, especially when trying to
+compare items from disconnected groups.
 
 ## Modeling Item Responses { #sec:demo-irt }
 
