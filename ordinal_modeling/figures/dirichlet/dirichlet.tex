@@ -1,0 +1,210 @@
+\documentclass{standalone}
+\usepackage{graphicx}	
+\usepackage{amssymb, amsmath}
+\usepackage{color}
+
+\usepackage{tikz}
+\usetikzlibrary{intersections, backgrounds, math}
+\usepackage{pgfmath}
+
+\definecolor{light}{RGB}{220, 188, 188}
+\definecolor{mid}{RGB}{185, 124, 124}
+\definecolor{dark}{RGB}{143, 39, 39}
+\definecolor{highlight}{RGB}{180, 31, 180}
+\definecolor{gray10}{gray}{0.1}
+\definecolor{gray20}{gray}{0.2}
+\definecolor{gray30}{gray}{0.3}
+\definecolor{gray40}{gray}{0.4}
+\definecolor{gray60}{gray}{0.6}
+\definecolor{gray70}{gray}{0.7}
+\definecolor{gray80}{gray}{0.8}
+\definecolor{gray90}{gray}{0.9}
+\definecolor{gray95}{gray}{0.95}
+
+\tikzmath{
+  function normal(\x, \m, \s) {
+    return exp(-0.5 * (\x - \m) * (\x - \m) / (\s * \s) ) / (2.506628274631001 * \s);
+  };
+}
+
+\begin{document}
+
+\begin{tikzpicture}[scale=1]
+
+  %%%%%
+  \begin{scope}[shift={(0, 0)}]
+    \draw[white] (-3, -3.5) rectangle (3, 2);
+    
+    \foreach [count=\n] \m in {0.1, 0.2, 0.4, 0.2, 0.1} {
+      \pgfmathsetmacro{\x}{1 * ( (\n - 1) - 2)};
+      \fill[light] (\x, {(7 * \m - 2)}) circle (0.05);
+      
+      \ifnum \n=5
+        \node[light] at (+2.5, {(7 * \m - 2)}) { $\rho_{k}$ };
+      \fi
+    }
+    
+    \foreach [count=\n] \m in {0.10787, 0.10164, 0.48808, 0.17792, 0.12449} {
+      \pgfmathsetmacro{\x}{1 * ( (\n - 1) - 2)};
+      \fill[dark] (\x, {(7 * \m - 2)}) circle (0.05);
+      \fill[white] (\x, -2) circle (0.065);
+      \fill[black] (\x, -2) circle (0.05);
+      
+      \node at (\x, -2.35) { $\n$ };
+      
+      \ifnum \n=1
+        \node[dark] at (-2.5, {(7 * \m - 2)}) { $p_{k}$ };
+      \fi
+    }
+ 
+    \node at (0, -3) { Ordinal Space };
+  \end{scope}
+  
+  %%%%%
+  \begin{scope}[shift={(6, 0)}]
+    \draw[white] (-3, -3.5) rectangle (3, 2);
+    
+    \foreach [count=\n] \m in {0.1, 0.2, 0.4, 0.2, 0.1} {
+      \pgfmathsetmacro{\x}{1 * ( (\n - 1) - 2)};
+      \fill[light] (\x, {(7 * \m - 2)}) circle (0.05);
+      
+      \ifnum \n=5
+        \node[light] at (+2.5, {(7 * \m - 2)}) { $\rho_{k}$ };
+      \fi
+    }
+    
+    \foreach [count=\n] \m in {0.02731, 0.36057, 0.38989, 0.06489, 0.15735} {
+      \pgfmathsetmacro{\x}{1 * ( (\n - 1) - 2)};
+      \fill[dark] (\x, {(7 * \m - 2)}) circle (0.05);
+      \fill[white] (\x, -2) circle (0.065);
+      \fill[black] (\x, -2) circle (0.05);
+      
+      \node at (\x, -2.35) { $\n$ };
+      
+      \ifnum \n=1
+        \node[dark] at (-2.5, {(7 * \m - 2)}) { $p_{k}$ };
+      \fi
+    }
+ 
+    \node at (0, -3) { Ordinal Space };
+  \end{scope}
+
+  %%%%%
+  \begin{scope}[shift={(12, 0)}]
+    \draw[white] (-3, -3.5) rectangle (3, 2);
+    
+    \foreach [count=\n] \m in {0.1, 0.2, 0.4, 0.2, 0.1} {
+      \pgfmathsetmacro{\x}{1 * ( (\n - 1) - 2)};
+      \fill[light] (\x, {(7 * \m - 2)}) circle (0.05);
+      
+      \ifnum \n=5
+        \node[light] at (+2.5, {(7 * \m - 2)}) { $\rho_{k}$ };
+      \fi
+    }
+    
+    \foreach [count=\n] \m in {0.19246, 0.16549, 0.33641, 0.22543, 0.08021} {
+      \pgfmathsetmacro{\x}{1 * ( (\n - 1) - 2)};
+      \fill[dark] (\x, {(7 * \m - 2)}) circle (0.05);
+      \fill[white] (\x, -2) circle (0.065);
+      \fill[black] (\x, -2) circle (0.05);
+      
+      \node at (\x, -2.35) { $\n$ };
+      
+      \ifnum \n=1
+        \node[dark] at (-2.5, {(7 * \m - 2)}) { $p_{k}$ };
+      \fi
+    }
+ 
+    \node at (0, -3) { Ordinal Space };
+  \end{scope}
+  
+  %%%%%
+  \begin{scope}[shift={(0, -5.5)}]
+    \draw[white] (-3, -3.5) rectangle (3, 2);
+    
+    \foreach [count=\n] \m in {0.1, 0.2, 0.4, 0.2, 0.1} {
+      \pgfmathsetmacro{\x}{1 * ( (\n - 1) - 2)};
+      \fill[light] (\x, {(7 * \m - 2)}) circle (0.05);
+      
+      \ifnum \n=5
+        \node[light] at (+2.5, {(7 * \m - 2)}) { $\rho_{k}$ };
+      \fi
+    }
+    
+    \foreach [count=\n] \m in {0.19575, 0.21868, 0.38216, 0.11886, 0.08455} {
+      \pgfmathsetmacro{\x}{1 * ( (\n - 1) - 2)};
+      \fill[dark] (\x, {(7 * \m - 2)}) circle (0.05);
+      \fill[white] (\x, -2) circle (0.065);
+      \fill[black] (\x, -2) circle (0.05);
+      
+      \node at (\x, -2.35) { $\n$ };
+      
+      \ifnum \n=1
+        \node[dark] at (-2.5, {(7 * \m - 2)}) { $p_{k}$ };
+      \fi
+    }
+ 
+    \node at (0, -3) { Ordinal Space };
+  \end{scope}
+  
+  %%%%%
+  \begin{scope}[shift={(6, -5.5)}]
+    \draw[white] (-3, -3.5) rectangle (3, 2);
+    
+    \foreach [count=\n] \m in {0.1, 0.2, 0.4, 0.2, 0.1} {
+      \pgfmathsetmacro{\x}{1 * ( (\n - 1) - 2)};
+      \fill[light] (\x, {(7 * \m - 2)}) circle (0.05);
+      
+      \ifnum \n=5
+        \node[light] at (+2.5, {(7 * \m - 2)}) { $\rho_{k}$ };
+      \fi
+    }
+    
+    \foreach [count=\n] \m in {0.06295, 0.20562, 0.34193, 0.26195, 0.12755} {
+      \pgfmathsetmacro{\x}{1 * ( (\n - 1) - 2)};
+      \fill[dark] (\x, {(7 * \m - 2)}) circle (0.05);
+      \fill[white] (\x, -2) circle (0.065);
+      \fill[black] (\x, -2) circle (0.05);
+      
+      \node at (\x, -2.35) { $\n$ };
+      
+      \ifnum \n=1
+        \node[dark] at (-2.5, {(7 * \m - 2)}) { $p_{k}$ };
+      \fi
+    }
+ 
+    \node at (0, -3) { Ordinal Space };
+  \end{scope}
+  
+  %%%%%
+  \begin{scope}[shift={(12, -5.5)}]
+    \draw[white] (-3, -3.5) rectangle (3, 2);
+    
+    \foreach [count=\n] \m in {0.1, 0.2, 0.4, 0.2, 0.1} {
+      \pgfmathsetmacro{\x}{1 * ( (\n - 1) - 2)};
+      \fill[light] (\x, {(7 * \m - 2)}) circle (0.05);
+      
+      \ifnum \n=5
+        \node[light] at (+2.5, {(7 * \m - 2)}) { $\rho_{k}$ };
+      \fi
+    }
+    
+    \foreach [count=\n] \m in {0.10687, 0.27928, 0.18791, 0.14880, 0.27713} {
+      \pgfmathsetmacro{\x}{1 * ( (\n - 1) - 2)};
+      \fill[dark] (\x, {(7 * \m - 2)}) circle (0.05);
+      \fill[white] (\x, -2) circle (0.065);
+      \fill[black] (\x, -2) circle (0.05);
+      
+      \node at (\x, -2.35) { $\n$ };
+      
+      \ifnum \n=1
+        \node[dark] at (-2.5, {(7 * \m - 2)}) { $p_{k}$ };
+      \fi
+    }
+ 
+    \node at (0, -3) { Ordinal Space };
+  \end{scope}
+  
+\end{tikzpicture}
+
+\end{document}  

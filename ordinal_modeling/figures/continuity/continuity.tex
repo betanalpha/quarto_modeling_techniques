@@ -1,0 +1,102 @@
+\documentclass{standalone}
+\usepackage{graphicx}	
+\usepackage{amssymb, amsmath}
+\usepackage{color}
+
+\usepackage{tikz}
+\usetikzlibrary{intersections, backgrounds, math}
+\usepackage{pgfmath}
+
+\definecolor{light}{RGB}{220, 188, 188}
+\definecolor{mid}{RGB}{185, 124, 124}
+\definecolor{dark}{RGB}{143, 39, 39}
+\definecolor{highlight}{RGB}{180, 31, 180}
+\definecolor{gray10}{gray}{0.1}
+\definecolor{gray20}{gray}{0.2}
+\definecolor{gray30}{gray}{0.3}
+\definecolor{gray40}{gray}{0.4}
+\definecolor{gray60}{gray}{0.6}
+\definecolor{gray70}{gray}{0.7}
+\definecolor{gray80}{gray}{0.8}
+\definecolor{gray90}{gray}{0.9}
+\definecolor{gray95}{gray}{0.95}
+
+\tikzmath{
+  function normal(\x, \m, \s) {
+    return exp(-0.5 * (\x - \m) * (\x - \m) / (\s * \s) ) / (2.506628274631001 * \s);
+  };
+}
+
+\begin{document}
+
+\begin{tikzpicture}[scale=1]
+
+  %%%%%
+  \begin{scope}[shift={(0, 0)}]
+    \draw[white] (-3, -3.5) rectangle (3, 2.5);
+    
+    \node[dark] at (0, 2) { More Continuous };
+    
+    \foreach [count=\n] \m in {0.2, 0.2, 0.2, 0.2, 0.2} {
+      \pgfmathsetmacro{\x}{1 * ( (\n - 1) - 2)};
+      \fill[dark] (\x, {(9 * \m - 2)}) circle (0.05);
+      \fill[white] (\x, -2) circle (0.065);
+      \fill[black] (\x, -2) circle (0.05);
+      
+      \node at (\x, -2.35) { $\n$ };
+      
+      \ifnum \n=1
+        \node[dark] at (-2.5, {(9 * \m - 2)}) { $p_{k}$ };
+      \fi
+    }
+ 
+    \node at (0, -3) { Ordinal Space };
+  \end{scope}
+  
+  %%%%%
+  \begin{scope}[shift={(6, 0)}]
+    \draw[white] (-3, -3.5) rectangle (3, 2.5);
+    
+    \draw[<->, >=stealth, dark, line width=1] (-4, 2) -- (4, 2);
+    
+    \foreach [count=\n] \m in {0.05, 0.1, 0.3, 0.35, 0.2} {
+      \pgfmathsetmacro{\x}{1 * ( (\n - 1) - 2)};
+      \fill[dark] (\x, {(9 * \m - 2)}) circle (0.05);
+      \fill[white] (\x, -2) circle (0.065);
+      \fill[black] (\x, -2) circle (0.05);
+      
+      \node at (\x, -2.35) { $\n$ };
+      
+      \ifnum \n=1
+        \node[dark] at (-2.5, {(9 * \m - 2)}) { $p_{k}$ };
+      \fi
+    }
+ 
+    \node at (0, -3) { Ordinal Space };
+  \end{scope}
+
+  %%%%%
+  \begin{scope}[shift={(12, 0)}]
+    \draw[white] (-3, -3.5) rectangle (3, 2.5);
+    
+    \node[dark] at (0, 2) { Less Continuous };
+    
+    \foreach [count=\n] \m in {0.20041, 0.33799, 0.07187, 0.23778, 0.15195} {
+      \pgfmathsetmacro{\x}{1 * ( (\n - 1) - 2)};
+      \fill[dark] (\x, {(9 * \m - 2)}) circle (0.05);
+      \fill[white] (\x, -2) circle (0.065);
+      \fill[black] (\x, -2) circle (0.05);
+      
+      \node at (\x, -2.35) { $\n$ };
+      
+      \ifnum \n=1
+        \node[dark] at (-2.5, {(9 * \m - 2)}) { $p_{k}$ };
+      \fi
+    }
+ 
+    \node at (0, -3) { Ordinal Space };
+  \end{scope}
+    
+\end{tikzpicture}
+
+\end{document}  

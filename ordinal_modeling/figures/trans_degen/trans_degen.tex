@@ -1,0 +1,156 @@
+\documentclass{standalone}
+\usepackage{graphicx}	
+\usepackage{amssymb, amsmath}
+\usepackage{color}
+
+\usepackage{tikz}
+\usetikzlibrary{intersections, backgrounds, math}
+\usepackage{pgfmath}
+
+\definecolor{light}{RGB}{220, 188, 188}
+\definecolor{mid}{RGB}{185, 124, 124}
+\definecolor{dark}{RGB}{143, 39, 39}
+\definecolor{highlight}{RGB}{180, 31, 180}
+\definecolor{gray10}{gray}{0.1}
+\definecolor{gray20}{gray}{0.2}
+\definecolor{gray30}{gray}{0.3}
+\definecolor{gray40}{gray}{0.4}
+\definecolor{gray60}{gray}{0.6}
+\definecolor{gray70}{gray}{0.7}
+\definecolor{gray80}{gray}{0.8}
+\definecolor{gray90}{gray}{0.9}
+\definecolor{gray95}{gray}{0.95}
+
+\tikzmath{
+  function normal(\x, \m, \s) {
+    return exp(-0.5 * (\x - \m) * (\x - \m) / (\s * \s) ) / (2.506628274631001 * \s);
+  };
+}
+
+\begin{document}
+
+\begin{tikzpicture}[scale=1]
+
+  \begin{scope}[shift={(-5, 0)}]
+    \draw[white] (-2.5, -3.25) rectangle (2.5, 3);
+    
+    \node at (0, 2.5) { $p(x + \delta)$ };
+    \node at (0, 2) { $c_{k} - \delta$ };
+
+    \pgfmathsetmacro{\delta}{-0.5}
+
+    \begin{scope}
+      \clip (-2, -2.1) rectangle (2, 1.75);
+      \fill[domain=-2:2, smooth, samples=100, variable=\x, dark, line width=1] 
+        plot (\x, {3 * normal(\x, \delta, 0.35) - 2});
+    \end{scope}
+
+    \foreach [count=\n] \c in {-0.8, -0.3, 0.3, 0.8} {
+      \draw[white, line width=1.25] (\c + \delta, -2) -- +(0, 3.65);
+      \draw[gray80, dashed, line width=1] (\c + \delta, -2) -- +(0, 3.65);
+      \node at (\c + \delta, -2.25) { $c_{\n}$ };
+    }
+
+    \draw [<->, >=stealth, line width=1] (-2.25, -2.00) -- +(4.5, 0);
+
+    \node at (0, -2.75) { Latent Space };
+  \end{scope}
+
+  \begin{scope}[shift={(-5, -4.25)}]
+    \draw[white] (-2.5, -3.5) rectangle (2.5, 1);
+    
+    \foreach [count=\n] \m in {0.011, 0.185, 0.609, 0.185, 0.011} {
+      \pgfmathsetmacro{\x}{0.8 * ( (\n - 1) - 2)};
+      \draw[dark, line width=3] (\x, -2) -- (\x, {(4 * \m - 2)});
+      \fill[dark] (\x, {(4 * \m - 2)}) circle (0.05);
+      \fill[white] (\x, -2) circle (0.065);
+      \fill[black] (\x, -2) circle (0.05);
+      
+      \node at (\x, -2.35) { $\n$ };
+    }
+ 
+    \node at (0, -3) { Ordinal Space };
+  \end{scope}
+
+  \begin{scope}[shift={(0, 0)}]
+    \draw[white] (-2.5, -3.25) rectangle (2.5, 3);
+    
+    \node at (0, 2.5) { Baseline };
+
+    \begin{scope}
+      \clip (-2, -2.1) rectangle (2, 1.75);
+      \fill[domain=-2:2, smooth, samples=100, variable=\x, dark, line width=1] 
+        plot (\x, {3 * normal(\x, 0, 0.35) - 2});
+    \end{scope}
+
+    \foreach [count=\n] \c in {-0.8, -0.3, 0.3, 0.8} {
+      \draw[white, line width=1.25] (\c, -2) -- +(0, 3.65);
+      \draw[gray80, dashed, line width=1] (\c, -2) -- +(0, 3.65);
+      \node at (\c, -2.25) { $c_{\n}$ };
+    }
+
+    \draw [<->, >=stealth, line width=1] (-2.25, -2.00) -- +(4.5, 0);
+
+    \node at (0, -2.75) { Latent Space };
+  \end{scope}
+
+  \begin{scope}[shift={(0, -4.25)}]
+    \draw[white] (-2.5, -3.5) rectangle (2.5, 1);
+    
+    \foreach [count=\n] \m in {0.011, 0.185, 0.609, 0.185, 0.011} {
+      \pgfmathsetmacro{\x}{0.8 * ( (\n - 1) - 2)};
+      \draw[dark, line width=3] (\x, -2) -- (\x, {(4 * \m - 2)});
+      \fill[dark] (\x, {(4 * \m - 2)}) circle (0.05);
+      \fill[white] (\x, -2) circle (0.065);
+      \fill[black] (\x, -2) circle (0.05);
+      
+      \node at (\x, -2.35) { $\n$ };
+    }
+ 
+    \node at (0, -3) { Ordinal Space };
+  \end{scope}
+
+  \begin{scope}[shift={(+5, 0)}]
+    \draw[white] (-2.5, -3.25) rectangle (2.5, 3);
+    
+    \node at (0, 2.5) { $p(x - \delta)$ };
+    \node at (0, 2) { $c_{k} + \delta$ };
+
+    \pgfmathsetmacro{\delta}{+0.5}
+
+    \begin{scope}
+      \clip (-2, -2.1) rectangle (2, 1.75);
+      \fill[domain=-2:2, smooth, samples=100, variable=\x, dark, line width=1] 
+        plot (\x, {3 * normal(\x, \delta, 0.35) - 2});
+    \end{scope}
+
+    \foreach [count=\n] \c in {-0.8, -0.3, 0.3, 0.8} {
+      \draw[white, line width=1.25] (\c + \delta, -2) -- +(0, 3.65);
+      \draw[gray80, dashed, line width=1] (\c + \delta, -2) -- +(0, 3.65);
+      \node at (\c + \delta, -2.25) { $c_{\n}$ };
+    }
+
+    \draw [<->, >=stealth, line width=1] (-2.25, -2.00) -- +(4.5, 0);
+
+    \node at (0, -2.75) { Latent Space };
+  \end{scope}
+
+  \begin{scope}[shift={(+5, -4.25)}]
+    \draw[white] (-2.5, -3.5) rectangle (2.5, 1);
+    
+    \foreach [count=\n] \m in {0.011, 0.185, 0.609, 0.185, 0.011} {
+      \pgfmathsetmacro{\x}{0.8 * ( (\n - 1) - 2)};
+      \draw[dark, line width=3] (\x, -2) -- (\x, {(4 * \m - 2)});
+      \fill[dark] (\x, {(4 * \m - 2)}) circle (0.05);
+      \fill[white] (\x, -2) circle (0.065);
+      \fill[black] (\x, -2) circle (0.05);
+      
+      \node at (\x, -2.35) { $\n$ };
+    }
+ 
+    \node at (0, -3) { Ordinal Space };
+  \end{scope}
+  
+\end{tikzpicture}
+
+\end{document}  
