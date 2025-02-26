@@ -1,7 +1,7 @@
 ---
 title: "Ordinal Modeling"
 author: "Michael Betancourt"
-date: "February 2024"
+date: "February 2025"
 date-format: "MMMM YYYY"
 toc: true
 number-sections: true
@@ -79,9 +79,9 @@ neighboring elements can be arbitrarily far apart the coupling between
 neighboring behaviors can be arbitrarily weak.  Moreover the coupling
 will not, in general, be uniform across different neighbors.
 
-A common application of ordinal spaces is the modeling of data that are
-collected by soliciting from individuals judgements or preferences
-limited to discrete but ordered values.  For example the possible
+A common application of ordinal spaces is modeling data that are
+collected by soliciting from individuals judgements or preferences that
+are limited to discrete but ordered values.  For example the possible
 responses in a survey might be
 $$
 \text{Disagree}, \text{Undecided}, \text{Agree}
@@ -123,7 +123,7 @@ that define a $(K - 1)$-simplex configuration,
 \begin{align*}
 0 \le p_{1}, \ldots, \, p_{k}&, \ldots, p_{K} \le 1
 \\
-\sum_{k = 1}^{K} p_{k}& = 0.
+\sum_{k = 1}^{K} p_{k}& = 1.
 \end{align*}
 Specifying a probability distribution over a finite space with atomic
 probabilities is sometimes referred to as a **categorical model** with
@@ -156,7 +156,7 @@ Moreover in circumstances where we do have quantified domain expertise
 it can often be implemented with a simple categorical model complemented
 by an informative prior model.  In particular if our domain expertise
 manifests as a preference for probabilities that vary around a baseline
-implex configuration $\boldsymbol{\rho}$ then we could use a Dirichlet
+simplex configuration $\boldsymbol{\rho}$ then we could use a Dirichlet
 prior model with the configuration (@fig-dirichlet)
 $$
 \alpha_{k} = \rho_{k} / \tau + 1.
@@ -290,13 +290,13 @@ For any probability distribution on a real line we have
 \int_{-\infty}^{-x} \mathrm{d} x' \, p(x')
 \\
 &=
--\int_{+\infty}^{x} \mathrm{d} z' \, p(z')
+-\int_{+\infty}^{x} \mathrm{d} x'' \, p(x'')
 \\
 &=
-\int_{x}^{\infty} \mathrm{d} z' \, p(z')
+\int_{x}^{\infty} \mathrm{d} x'' \, p(x'')
 \\
 &=
-1 - \int_{-\infty}^{x} \mathrm{d} z' \, p(z')
+1 - \int_{-\infty}^{x} \mathrm{d} x'' \, p(x'')
 \\
 &=
 1 - \Pi(x).
@@ -340,7 +340,7 @@ allocations to non-neighboring intervals.
 
 That said if the configuration of the interior cut points, and the
 lengths of the intervals between them, is arbitrary then the resulting
-ordinal probabilities will also be arbitrarily _regardless of the shape
+ordinal probabilities will also be arbitrary _regardless of the shape
 of the latent probability density function_.  More formally for _any_
 fixed latent probability density function we have a bijection between
 the interior cut points and the first $K - 1$ ordinal probabilities,
@@ -583,9 +583,9 @@ handled by first mapping to an unconstrained space with something like
 the stick breaking map.  Moreover as we saw in
 [Section 3.2](#sec:duality) the mapping from interior cut points to
 ordinal probabilities is very similar to stick breaking.  Consequently
-any differences in implemented these models with either interior cut
-points or baseline ordinal probabilities should be small in practice,
-although there can always be exceptions.
+any differences in the implementation of these models with either
+interior cut points or baseline ordinal probabilities should be small in
+practice, although there can always be exceptions.
 
 ## Interpretations of the Cut Point Construction
 
@@ -2650,14 +2650,15 @@ and in practice.
 Discretizing a probability distribution over a latent real line with
 cut points doesn't incorporate ordering into any model of baseline
 ordinal probabilities.  It does, however, allow us to incorporate the
-ordering when we modeling how ordinal probabilities vary around that
+ordering when we model how ordinal probabilities vary around that
 baseline.  Moreover it establishes a modeling foundation on which we can
 incorporate heterogeneous baseline ordinal probabilities and more.
 
 # Acknowledgements {-}
 
-I thank Max Kesin, Mark Donoghoe, shleeneu, Jan Siml, and Florian
-Pargent for helpful comments on a previous version of this chapter.
+I thank jd for helpful comments as well as Max Kesin, Mark Donoghoe,
+shleeneu, Jan Siml, and Florian Pargent for helpful comments on a
+previous version of this chapter.
 
 A very special thanks to everyone supporting me on Patreon:
 Adam Fleischhacker, Alejandro Navarro-Martínez, Alessandro Varacca,
