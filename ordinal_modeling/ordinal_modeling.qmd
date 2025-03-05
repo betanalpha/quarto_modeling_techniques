@@ -290,10 +290,19 @@ For any probability distribution on a real line we have
 \int_{-\infty}^{-x} \mathrm{d} x' \, p(x')
 \\
 &=
--\int_{+\infty}^{x} \mathrm{d} x'' \, p(x'')
+-\int_{+\infty}^{x} \mathrm{d} x'' \, p(-x'')
 \\
 &=
-\int_{x}^{\infty} \mathrm{d} x'' \, p(x'')
+\int_{x}^{\infty} \mathrm{d} x'' \, p(-x'')
+\\
+&=
+1 - \int_{-\infty}^{x} \mathrm{d} x'' \, p(-x'').
+\end{align*}
+If the latent probability density function is even, $p(-x) = p(x)$, then
+\begin{align*}
+\Pi(-x)
+&=
+1 - \int_{-\infty}^{x} \mathrm{d} x'' \, p(-x'')
 \\
 &=
 1 - \int_{-\infty}^{x} \mathrm{d} x'' \, p(x'')
@@ -301,7 +310,7 @@ For any probability distribution on a real line we have
 &=
 1 - \Pi(x).
 \end{align*}
-Consequently we can also write the ordinal probabilities as
+Consequently in this case we can also write the ordinal probabilities as
 (@fig-ccdf-calcs)
 \begin{align*}
 p_{k}
@@ -320,7 +329,7 @@ p_{k}
 &=
 \Pi(-c_{k - 1}) - \Pi(-c_{k}).
 \end{align*}
-This equivalent form is more common in some references.
+This form is more common in some references.
 
 
 ![Interval probabilities can also be written as differences of
@@ -434,29 +443,40 @@ functions with both analytic cumulative distribution functions and
 inverse cumulative distribution functions.  Similarly we might make our
 choice based on computational cost considerations.
 
-Taking a logistic probability density function
+If we take a logistic probability density function
 $$
-\pi(x; \mu, \sigma)
+p(x; \mu, \sigma)
 =
 \frac{1}{\sigma}
 \frac{ \exp \left( - \frac{ x - \mu }{ \sigma } \right) }
 { \left( 1 + \exp \left( - \frac{ x - \mu }{ \sigma } \right) \right)^{2} }
 $$
-with the cumulative distribution function
+then the cumulative distribution function is given by the analytic
+logistic function,
 $$
-\pi(x; \mu, \sigma)
+\Pi(x; \mu, \sigma)
 =
-\frac{ 1 }{ 1 + \exp \left( - \frac{ x - \mu }{ \sigma } \right) }
+\frac{ 1 }{ 1 + \exp \left( - \frac{ x - \mu }{ \sigma } \right) },
 $$
-gives what is known as an **ordered logit** model, or sometimes an
-**ordered logistic** model.  The analytic form of the logistic
-cumulative distribution function and its inverse makes the ordered logit
-model particularly convenient to implement.
+and its inverse is given by the analytic logit function,
+$$
+\Pi^{-1}(p; \mu, \sigma)
+=
+\mu + \sigma \, \log \frac{p}{1 - p}.
+$$
+These analytic forms make this model particularly convenient to
+implement in practice.
 
-Similarly taking a normal probability density function gives what is
-known as an **ordered probit** model.  The inverse normal cumulative
-distribution function is available in many statistical programming
-environments but it is not quite as convenient as the inverse logistic
+The terminology for these models isn't always consistent.  Usually,
+however, they are named after the latent cumulative distribution
+function or its inverse.  For example the above model is referred to as
+both the **ordered logit** model and the **ordered logistic** model.
+
+Similarly an ordinal model based on a normal probability density
+function is commonly referred to as an **ordered probit** model, with
+"probit" a common name for the inverse normal cumulative distribution
+function.  The probit function is available in many statistical
+programming environments but it is not quite as convenient as the logit
 function.
 
 ## Perturbing Ordinal Probabilities
@@ -1153,6 +1173,7 @@ then the equivalent prior model over the interior cut points is given
 by
 $$
 p( \mathbf{c} )
+=
 \text{Dirichlet} \left( \phi^{-1}(\mathbf{c}) \mid
                   \alpha_{1}, \ldots, \alpha_{K} \right)
 \cdot \left| \prod_{k = 1}^{K - 1} p(c_{k}) \right|.
@@ -1748,7 +1769,7 @@ util$plot_disc_pushforward_quantiles(samples2, names,
 
 ```{r}
 plot_cut_point_overlay(samples2, 'cut_points[',
-                       flim=c(-7, 7), fname='Interior Cut Points',
+                       flim=c(-10, 4), fname='Interior Cut Points',
                        ylim=c(0, 1.5))
 ```
 
@@ -1806,8 +1827,7 @@ par(mfrow=c(2, 2), mar=c(5, 5, 1, 1))
 
 for (k in 1:(data$K - 1)) {
   name <- paste0('cut_points[', k, ']')
-  util$plot_expectand_pushforward(samples3[[name]],
-                                  35, flim=c(-10, 4),
+  util$plot_expectand_pushforward(samples3[[name]], 25,
                                   display_name=name,
                                   ylim=c(0, 1.5))
 }
@@ -1947,7 +1967,7 @@ par(mfrow=c(3, 3), mar=c(5, 5, 1, 1))
 for (i in 1:data$I) {
   util$plot_line_hist(data$y[data$item_idx == i],
                       0.5, 5.5, 1, xlab="Ordinal",
-                      main=paste0("Item", i))
+                      main=paste("Item", i))
 }
 ```
 

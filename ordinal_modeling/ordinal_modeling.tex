@@ -466,18 +466,26 @@ For any probability distribution on a real line we have \begin{align*}
 \int_{-\infty}^{-x} \mathrm{d} x' \, p(x')
 \\
 &=
--\int_{+\infty}^{x} \mathrm{d} x'' \, p(x'')
+-\int_{+\infty}^{x} \mathrm{d} x'' \, p(-x'')
 \\
 &=
-\int_{x}^{\infty} \mathrm{d} x'' \, p(x'')
+\int_{x}^{\infty} \mathrm{d} x'' \, p(-x'')
+\\
+&=
+1 - \int_{-\infty}^{x} \mathrm{d} x'' \, p(-x'').
+\end{align*} If the latent probability density function is even,
+\(p(-x) = p(x)\), then \begin{align*}
+\Pi(-x)
+&=
+1 - \int_{-\infty}^{x} \mathrm{d} x'' \, p(-x'')
 \\
 &=
 1 - \int_{-\infty}^{x} \mathrm{d} x'' \, p(x'')
 \\
 &=
 1 - \Pi(x).
-\end{align*} Consequently we can also write the ordinal probabilities as
-(Figure~\ref{fig-ccdf-calcs}) \begin{align*}
+\end{align*} Consequently in this case we can also write the ordinal
+probabilities as (Figure~\ref{fig-ccdf-calcs}) \begin{align*}
 p_{k}
 &=
 \Pi(c_{k}) - \Pi(c_{k - 1})
@@ -493,7 +501,7 @@ p_{k}
 \\
 &=
 \Pi(-c_{k - 1}) - \Pi(-c_{k}).
-\end{align*} This equivalent form is more common in some references.
+\end{align*} This form is more common in some references.
 
 \begin{figure}
 
@@ -619,26 +627,36 @@ functions with both analytic cumulative distribution functions and
 inverse cumulative distribution functions. Similarly we might make our
 choice based on computational cost considerations.
 
-Taking a logistic probability density function \[
-\pi(x; \mu, \sigma)
+If we take a logistic probability density function \[
+p(x; \mu, \sigma)
 =
 \frac{1}{\sigma}
 \frac{ \exp \left( - \frac{ x - \mu }{ \sigma } \right) }
 { \left( 1 + \exp \left( - \frac{ x - \mu }{ \sigma } \right) \right)^{2} }
-\] with the cumulative distribution function \[
-\pi(x; \mu, \sigma)
+\] then the cumulative distribution function is given by the analytic
+logistic function, \[
+\Pi(x; \mu, \sigma)
 =
-\frac{ 1 }{ 1 + \exp \left( - \frac{ x - \mu }{ \sigma } \right) }
-\] gives what is known as an \textbf{ordered logit} model, or sometimes
-an \textbf{ordered logistic} model. The analytic form of the logistic
-cumulative distribution function and its inverse makes the ordered logit
-model particularly convenient to implement.
+\frac{ 1 }{ 1 + \exp \left( - \frac{ x - \mu }{ \sigma } \right) },
+\] and its inverse is given by the analytic logit function, \[
+\Pi^{-1}(p; \mu, \sigma)
+=
+\mu + \sigma \, \log \frac{p}{1 - p}.
+\] These analytic forms make this model particularly convenient to
+implement in practice.
 
-Similarly taking a normal probability density function gives what is
-known as an \textbf{ordered probit} model. The inverse normal cumulative
-distribution function is available in many statistical programming
-environments but it is not quite as convenient as the inverse logistic
-function.
+The terminology for these models isn't always consistent. Usually,
+however, they are named after the latent cumulative distribution
+function or its inverse. For example the above model is referred to as
+both the \textbf{ordered logit} model and the \textbf{ordered logistic}
+model.
+
+Similarly an ordinal model based on a normal probability density
+function is commonly referred to as an \textbf{ordered probit} model,
+with ``probit'' a common name for the inverse normal cumulative
+distribution function. The probit function is available in many
+statistical programming environments but it is not quite as convenient
+as the logit function.
 
 \subsection{Perturbing Ordinal
 Probabilities}\label{perturbing-ordinal-probabilities}
@@ -1354,6 +1372,7 @@ If our domain expertise is consistent with the Dirichlet prior model \[
 \] then the equivalent prior model over the interior cut points is given
 by \[
 p( \mathbf{c} )
+=
 \text{Dirichlet} \left( \phi^{-1}(\mathbf{c}) \mid
                   \alpha_{1}, \ldots, \alpha_{K} \right)
 \cdot \left| \prod_{k = 1}^{K - 1} p(c_{k}) \right|.
@@ -2370,14 +2389,14 @@ Markov chain Monte Carlo estimation.
 \begin{Shaded}
 \begin{Highlighting}[]
 \FunctionTok{plot\_cut\_point\_overlay}\NormalTok{(samples2, }\StringTok{\textquotesingle{}cut\_points[\textquotesingle{}}\NormalTok{,}
-                       \AttributeTok{flim=}\FunctionTok{c}\NormalTok{(}\SpecialCharTok{{-}}\DecValTok{7}\NormalTok{, }\DecValTok{7}\NormalTok{), }\AttributeTok{fname=}\StringTok{\textquotesingle{}Interior Cut Points\textquotesingle{}}\NormalTok{,}
+                       \AttributeTok{flim=}\FunctionTok{c}\NormalTok{(}\SpecialCharTok{{-}}\DecValTok{10}\NormalTok{, }\DecValTok{4}\NormalTok{), }\AttributeTok{fname=}\StringTok{\textquotesingle{}Interior Cut Points\textquotesingle{}}\NormalTok{,}
                        \AttributeTok{ylim=}\FunctionTok{c}\NormalTok{(}\DecValTok{0}\NormalTok{, }\FloatTok{1.5}\NormalTok{))}
 \end{Highlighting}
 \end{Shaded}
 
 \begin{verbatim}
-Warning in util$plot_expectand_pushforward(expectand_vals_list[[name]], : 177
-values (4.3%) fell below the histogram binning.
+Warning in util$plot_expectand_pushforward(expectand_vals_list[[name]], : 6
+values (0.1%) fell below the histogram binning.
 \end{verbatim}
 
 \begin{verbatim}
@@ -2536,23 +2555,12 @@ get only so far in finite time.
 
 \ControlFlowTok{for}\NormalTok{ (k }\ControlFlowTok{in} \DecValTok{1}\SpecialCharTok{:}\NormalTok{(data}\SpecialCharTok{$}\NormalTok{K }\SpecialCharTok{{-}} \DecValTok{1}\NormalTok{)) \{}
 \NormalTok{  name }\OtherTok{\textless{}{-}} \FunctionTok{paste0}\NormalTok{(}\StringTok{\textquotesingle{}cut\_points[\textquotesingle{}}\NormalTok{, k, }\StringTok{\textquotesingle{}]\textquotesingle{}}\NormalTok{)}
-\NormalTok{  util}\SpecialCharTok{$}\FunctionTok{plot\_expectand\_pushforward}\NormalTok{(samples3[[name]],}
-                                  \DecValTok{35}\NormalTok{, }\AttributeTok{flim=}\FunctionTok{c}\NormalTok{(}\SpecialCharTok{{-}}\DecValTok{10}\NormalTok{, }\DecValTok{4}\NormalTok{),}
+\NormalTok{  util}\SpecialCharTok{$}\FunctionTok{plot\_expectand\_pushforward}\NormalTok{(samples3[[name]], }\DecValTok{25}\NormalTok{,}
                                   \AttributeTok{display\_name=}\NormalTok{name,}
                                   \AttributeTok{ylim=}\FunctionTok{c}\NormalTok{(}\DecValTok{0}\NormalTok{, }\FloatTok{1.5}\NormalTok{))}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
-
-\begin{verbatim}
-Warning in util$plot_expectand_pushforward(samples3[[name]], 35, flim = c(-10,
-: 4063 values (99.2%) fell below the histogram binning.
-\end{verbatim}
-
-\begin{verbatim}
-Warning in util$plot_expectand_pushforward(samples3[[name]], 35, flim = c(-10,
-: 0 values (0.0%) fell above the histogram binning.
-\end{verbatim}
 
 \includegraphics{ordinal_modeling_files/figure-pdf/unnamed-chunk-43-1.pdf}
 
@@ -2816,7 +2824,7 @@ data exhibits clear differences in behavior across the items.
 \ControlFlowTok{for}\NormalTok{ (i }\ControlFlowTok{in} \DecValTok{1}\SpecialCharTok{:}\NormalTok{data}\SpecialCharTok{$}\NormalTok{I) \{}
 \NormalTok{  util}\SpecialCharTok{$}\FunctionTok{plot\_line\_hist}\NormalTok{(data}\SpecialCharTok{$}\NormalTok{y[data}\SpecialCharTok{$}\NormalTok{item\_idx }\SpecialCharTok{==}\NormalTok{ i],}
                       \FloatTok{0.5}\NormalTok{, }\FloatTok{5.5}\NormalTok{, }\DecValTok{1}\NormalTok{, }\AttributeTok{xlab=}\StringTok{"Ordinal"}\NormalTok{,}
-                      \AttributeTok{main=}\FunctionTok{paste0}\NormalTok{(}\StringTok{"Item"}\NormalTok{, i))}
+                      \AttributeTok{main=}\FunctionTok{paste}\NormalTok{(}\StringTok{"Item"}\NormalTok{, i))}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
