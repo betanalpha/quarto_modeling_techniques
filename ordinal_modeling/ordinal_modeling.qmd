@@ -1433,18 +1433,18 @@ util$plot_disc_pushforward_quantiles(samples1, names,
 ### Derived Cut Points
 
 Equivalently we can implement the categorical model by deriving interior
-cut points from the categorical probabilities and then using an ordered
-logit/logistic model.  Note that Stan's `ordered_logistic` model
-includes a builtin translation of the latent logistic probability
-density function as its first argument that we will fix to zero.
+cut points from the categorical probabilities and then using an ordinal
+model.  When modeling homogeneous ordinal probabilities these two steps
+always return the initial categorical probabilities so long as we
+consistently use the same logistic density function for both.
 
-```{.stan include="stan_programs/ordered_logistic_derived.stan" filename="ordered\\\_logistic\\\_derived.stan"}
+```{.stan include="stan_programs/ordinal_logistic_derived.stan" filename="ordinal\\\_logistic\\\_derived.stan"}
 ```
 
 ```{r}
 #| warning: false
 #| message: false
-fit <- stan(file="stan_programs/ordered_logistic_derived.stan",
+fit <- stan(file="stan_programs/ordinal_logistic_derived.stan",
             data=data, seed=8438338,
             warmup=1000, iter=2024, refresh=0)
 ```
@@ -1542,13 +1542,13 @@ and using an ill-defined prior model that attempts to be uniform over
 the interior cut points.  Critically this is _not_ the same as the
 uniform simplex prior model that we used above!
 
-```{.stan include="stan_programs/ordered_logistic.stan" filename="ordered\\\_logistic.stan"}
+```{.stan include="stan_programs/ordinal_logistic_uniform.stan" filename="ordered\\\_logistic\\\_uniform.stan"}
 ```
 
 ```{r}
 #| warning: false
 #| message: false
-fit <- stan(file="stan_programs/ordered_logistic.stan",
+fit <- stan(file="stan_programs/ordinal_logistic_uniform.stan",
             data=data, seed=8438338,
             warmup=1000, iter=2024, refresh=0)
 ```
@@ -1591,13 +1591,13 @@ simplex prior model into an equivalent prior model over the interior
 cut points.  Fortunately the induced Dirichlet prior model does just
 this.
 
-```{.stan include="stan_programs/ordered_logistic_induced.stan" filename="ordered\\\_logistic\\\_induced.stan"}
+```{.stan include="stan_programs/ordinal_logistic_induced_dirichlet.stan" filename="ordinal\\\_logistic\\\_induced\\\_dirichlet.stan"}
 ```
 
 ```{r}
 #| warning: false
 #| message: false
-fit <- stan(file="stan_programs/ordered_logistic_induced.stan",
+fit <- stan(file="stan_programs/ordinal_logistic_induced_dirichlet.stan",
             data=data, seed=8438338,
             warmup=1000, iter=2024, refresh=0)
 ```
@@ -1632,8 +1632,8 @@ plot_cut_point_overlay(samples4, 'cut_points[',
                        ylim=c(0, 1.5))
 ```
 
-In fact comparing to the `ordered_logistic_derived` model the inferences
-for the interior cut points are identical.
+In fact the inferences for the interior cut points are identical to
+those from the `ordinal_logistic_derived` model.
 
 ```{r}
 par(mfrow=c(2, 2), mar=c(5, 5, 1, 1))
@@ -1689,6 +1689,7 @@ Following the previous progression we start with a categorical model.
 ```{r}
 #| warning: false
 #| message: false
+#| cache: true
 fit <- stan(file="stan_programs/categorical.stan",
             data=data, seed=8438338,
             warmup=1000, iter=2024, refresh=0)
@@ -1710,6 +1711,7 @@ util$check_all_expectand_diagnostics(base_samples)
 Similarly there are no indications of model inadequacies.
 
 ```{r}
+#| cache: true
 par(mfrow=c(1, 1), mar=c(5, 5, 1, 1))
 
 util$plot_hist_quantiles(samples1, 'y_pred', 0.5, 5.5, 1,
@@ -1731,13 +1733,14 @@ util$plot_disc_pushforward_quantiles(samples1, names,
 An ordered logit/logistic model with derived cut points works just as
 well.
 
-```{.stan include="stan_programs/ordered_logistic_derived.stan" filename="ordered\\\_logistic\\\_derived.stan"}
+```{.stan include="stan_programs/ordinal_logistic_derived.stan" filename="ordinal\\\_logistic\\\_derived.stan"}
 ```
 
 ```{r}
 #| warning: false
 #| message: false
-fit <- stan(file="stan_programs/ordered_logistic_derived.stan",
+#| cache: true
+fit <- stan(file="stan_programs/ordinal_logistic_derived.stan",
             data=data, seed=8438338,
             warmup=1000, iter=2024, refresh=0)
 ```
@@ -1754,6 +1757,7 @@ util$check_all_expectand_diagnostics(base_samples)
 ```
 
 ```{r}
+#| cache: true
 par(mfrow=c(1, 1), mar=c(5, 5, 1, 1))
 
 util$plot_hist_quantiles(samples2, 'y_pred', 0.5, 5.5, 1,
@@ -1779,14 +1783,14 @@ Finally let's model the interior cut points directly and use the
 ill-defined uniform prior over the interior cut points that worked okay
 before.  Will our sloppiness continue to go unpunished?
 
-```{.stan include="stan_programs/ordered_logistic.stan" filename="ordered\\\_logistic.stan"}
+```{.stan include="stan_programs/ordinal_logistic_uniform.stan" filename="ordinal\\\_logistic\\\_uniform.stan"}
 ```
 
 ```{r}
 #| warning: false
 #| message: false
 #| cache: true
-fit <- stan(file="stan_programs/ordered_logistic.stan",
+fit <- stan(file="stan_programs/ordinal_logistic_uniform.stan",
             data=data, seed=8438338,
             warmup=1000, iter=2024, refresh=0)
 ```
@@ -1809,6 +1813,7 @@ util$check_all_expectand_diagnostics(base_samples)
 That said the retrodictive performance doesn't look bad at all.
 
 ```{r}
+#| cache: true
 par(mfrow=c(1, 1), mar=c(5, 5, 1, 1))
 
 util$plot_hist_quantiles(samples3, 'y_pred', 0.5, 5.5, 1,
@@ -1834,20 +1839,21 @@ for (k in 1:(data$K - 1)) {
 ```
 
 The reason we didn't see problems when using the `categorical` and
-`ordered_logistic_derived` models is that they employed a more
+`ordinal_logistic_derived` models is that they employed a more
 informative prior model.  Again uniformity over the interior cut points
 is not equivalent to uniformity over the ordinal probabilities!
 
 Fortunately we can incorporate the same informative prior model with the
 induced Dirichlet probability density function.
 
-```{.stan include="stan_programs/ordered_logistic_induced.stan" filename="ordered\\\_logistic\\\_induced.stan"}
+```{.stan include="stan_programs/ordinal_logistic_induced_dirichlet.stan" filename="ordinal\\\_logistic\\\_induced\\\_dirichlet.stan"}
 ```
 
 ```{r}
 #| warning: false
 #| message: false
-fit <- stan(file="stan_programs/ordered_logistic_induced.stan",
+#| cache: true
+fit <- stan(file="stan_programs/ordinal_logistic_induced_dirichlet.stan",
             data=data, seed=8438338,
             warmup=1000, iter=2024, refresh=0)
 ```
@@ -1868,6 +1874,7 @@ util$check_all_expectand_diagnostics(base_samples)
 The retrodictive performance is solid.
 
 ```{r}
+#| cache: true
 par(mfrow=c(1, 1), mar=c(5, 5, 1, 1))
 
 util$plot_hist_quantiles(samples4, 'y_pred', 0.5, 5.5, 1,
@@ -1974,17 +1981,23 @@ for (i in 1:data$I) {
 ### Ill-Defined Uniform Prior Model
 
 In order to infer the individual item qualities we can use an ordinal
-pairwise modeling approach.  Once again we'll start with an ill-defined
-uniform prior model over the interior cut points.
+pairwise modeling approach, with the item qualities shifting the latent
+logistic density function away from its baseline location.  Because the
+shifts will generally vary across observations I have implemented the
+`ordinal_shifted_logistic` for one observation at a time, requiring a
+loop in the observational model.
 
-```{.stan include="stan_programs/ordered_logistic_comp_uniform.stan" filename="ordered\\\_logistic\\\_comp_uniform.stan"}
+Once again we'll start with an ill-defined uniform prior model, this
+time over both the interior cut points and the item qualities.
+
+```{.stan include="stan_programs/ordinal_shifted_logistic_uniform.stan" filename="ordinal\\\_shifted\\\_logistic\\\_uniform.stan"}
 ```
 
 ```{r}
 #| warning: false
 #| message: false
 #| cache: true
-fit <- stan(file="stan_programs/ordered_logistic_comp_uniform.stan",
+fit <- stan(file="stan_programs/ordinal_shifted_logistic_uniform.stan",
             data=data, seed=8438338,
             warmup=1000, iter=2024, refresh=0)
 ```
@@ -2027,13 +2040,14 @@ probability density function and the interior cut points.  One way to
 remove this redundancy is to anchor the quality of one of the observed
 items to zero so that $\gamma_{i_{b}} = 0$ defines the baseline.
 
-```{.stan include="stan_programs/ordered_logistic_comp_anchor.stan" filename="ordered\\\_logistic\\\_comp\\\_anchor.stan"}
+```{.stan include="stan_programs/ordinal_shifted_logistic_anchor.stan" filename="ordinal\\\_shifted\\\_logistic\\\_anchor.stan"}
 ```
 
 ```{r}
 #| warning: false
 #| message: false
-fit <- stan(file="stan_programs/ordered_logistic_comp_anchor.stan",
+#| cache: true
+fit <- stan(file="stan_programs/ordinal_shifted_logistic_anchor.stan",
             data=data, seed=8438338,
             warmup=1000, iter=2024, refresh=0)
 ```
@@ -2056,6 +2070,7 @@ Moreover there are no indications of model inadequacy in either the
 aggregate or item-stratified histograms.
 
 ```{r}
+#| cache: true
 par(mfrow=c(1, 1), mar=c(5, 5, 1, 1))
 
 util$plot_hist_quantiles(samples2, 'y_pred', 0.5, 5.5, 1,
@@ -2063,6 +2078,7 @@ util$plot_hist_quantiles(samples2, 'y_pred', 0.5, 5.5, 1,
 ```
 
 ```{r}
+#| cache: true
 par(mfrow=c(3, 3), mar=c(5, 5, 1, 1))
 
 for (i in 1:data$I) {
@@ -2104,19 +2120,20 @@ for a hypothetical item with $\gamma = 0$.  Here we will use an induced
 Dirichlet prior model to contain the interior cut points to reasonable
 behaviors.
 
-```{.stan include="stan_programs/ordered_logistic_comp_induced.stan" filename="ordered\\\_logistic\\\_comp\\\_induced.stan"}
+```{.stan include="stan_programs/ordinal_shifted_logistic_induced_dirichlet.stan" filename="ordinal\\\_shifted\\\_logistic\\\_induced\\\_dirichlet.stan"}
 ```
 
 ```{r}
 #| warning: false
 #| message: false
-fit <- stan(file="stan_programs/ordered_logistic_comp_induced.stan",
+#| cache: true
+fit <- stan(file="stan_programs/ordinal_shifted_logistic_induced_dirichlet.stan",
             data=data, seed=8438338,
             warmup=1000, iter=2024, refresh=0)
 ```
 
 If any degeneracies remain then they are not strong enough to cause any
-computational issues.
+serious computational issues.
 
 ```{r}
 diagnostics <- util$extract_hmc_diagnostics(fit)
@@ -2134,6 +2151,7 @@ Retrodictive performance of both the aggregate and stratified histograms
 looks great.
 
 ```{r}
+#| cache: true
 par(mfrow=c(1, 1), mar=c(5, 5, 1, 1))
 
 util$plot_hist_quantiles(samples3, 'y_pred', 0.5, 5.5, 1,
@@ -2141,6 +2159,7 @@ util$plot_hist_quantiles(samples3, 'y_pred', 0.5, 5.5, 1,
 ```
 
 ```{r}
+#| cache: true
 par(mfrow=c(3, 3), mar=c(5, 5, 1, 1))
 
 for (i in 1:data$I) {
@@ -2174,17 +2193,33 @@ plot_cut_point_overlay(samples3, 'cut_points[',
                        ylim=c(0, 0.75))
 ```
 
-A mathematically equivalent implementation is to model the baseline
-ordinal probabilities and then derive the cut points assuming
-$\gamma = 0$.
+Note that `Stan` provides its own implementation of a shifted logistic
+ordinal model under the name `ordered_logistic`.  The `Stan`
+implementation also swaps the cut point and shift arguments relative to
+the convention that I've used here.
 
-```{.stan include="stan_programs/ordered_logistic_comp_derived.stan" filename="ordered\\\_logistic\\\_comp\\\_derived.stan"}
+Because it is coded in `C++` the `Stan` implementation is a bit faster
+that what I have implemented here; it is also accepts vector arguments
+for the shifts so that the observational model can be defined without a
+loop.
+
+```{.stan include="stan_programs/ordered_logistic_induced_dirichlet.stan" filename="ordered\\\_logistic\\\_induced\\\_dirichlet.stan"}
+```
+
+Finally another mathematically equivalent implementation is to model the
+baseline ordinal probabilities and then derive the interior cut points
+assuming $\gamma = 0$.  Once we've derived the cut points we can then
+shift the latent logistic density function to perturb the ordinal
+probabilities for each item.
+
+```{.stan include="stan_programs/ordinal_shifted_logistic_derived.stan" filename="ordinal\\\_shifted\\\_logistic\\\_derived.stan"}
 ```
 
 ```{r}
 #| warning: false
 #| message: false
-fit <- stan(file="stan_programs/ordered_logistic_comp_derived.stan",
+#| cache: true
+fit <- stan(file="stan_programs/ordinal_shifted_logistic_derived.stan",
             data=data, seed=8438338,
             warmup=1000, iter=2024, refresh=0)
 ```
@@ -2207,6 +2242,7 @@ Otherwise the retrodictive performance is similar to what we saw with
 the `ordered_logistic_comp_induced` model implementation.
 
 ```{r}
+#| cache: true
 par(mfrow=c(1, 1), mar=c(5, 5, 1, 1))
 
 util$plot_hist_quantiles(samples4, 'y_pred', 0.5, 5.5, 1,
@@ -2214,6 +2250,7 @@ util$plot_hist_quantiles(samples4, 'y_pred', 0.5, 5.5, 1,
 ```
 
 ```{r}
+#| cache: true
 par(mfrow=c(3, 3), mar=c(5, 5, 1, 1))
 
 for (i in 1:data$I) {
@@ -2385,13 +2422,14 @@ Moreover if the contexts are exchangeable then using the induced
 Dirichlet prior model we can couple the interior cut points together
 with a [Dirichlet population model](https://betanalpha.github.io/assets/chapters_html/die_fairness.html#hierarchical-simplices).
 
-```{.stan include="stan_programs/ordered_logistic_comp_induced_hier.stan" filename="ordered\\\_logistic\\\_comp\\\_induced\\\_hier.stan"}
+```{.stan include="stan_programs/ordinal_shifted_logistic_induced_dirichlet_hier.stan" filename="ordinal\\\_shifted\\\_logistic\\\_induced\\\_dirichlet\\\_hier.stan"}
 ```
 
 ```{r}
 #| warning: false
 #| message: false
-fit <- stan(file="stan_programs/ordered_logistic_comp_induced_hier.stan",
+#| cache: true
+fit <- stan(file="stan_programs/ordinal_shifted_logistic_induced_dirichlet_hier.stan",
             data=data, seed=8438338,
             warmup=1000, iter=2024, refresh=0)
 ```
@@ -2417,6 +2455,7 @@ The retrodictive performance of the model is great no matter how we
 slice and dice the observational space.
 
 ```{r}
+#| cache: true
 par(mfrow=c(1, 1), mar=c(5, 5, 1, 1))
 
 util$plot_hist_quantiles(samples1, 'y_pred', 0.5, 5.5, 1,
@@ -2425,6 +2464,7 @@ util$plot_hist_quantiles(samples1, 'y_pred', 0.5, 5.5, 1,
 
 
 ```{r}
+#| cache: true
 par(mfrow=c(3, 3), mar=c(5, 5, 1, 1))
 
 for (i in 1:data$I) {
@@ -2442,6 +2482,7 @@ for (i in 1:data$I) {
 ```
 
 ```{r}
+#| cache: true
 par(mfrow=c(3, 3), mar=c(5, 5, 1, 1))
 
 for (j in 1:data$J) {
@@ -2506,13 +2547,14 @@ Finally we can construct the same inferences by modeling the baseline
 ordinal probabilities in each context and then deriving the
 corresponding interior cut points.
 
-```{.stan include="stan_programs/ordered_logistic_comp_derived_hier.stan" filename="ordered\\\_logistic\\\_comp\\\_derived\\\_hier.stan"}
+```{.stan include="stan_programs/ordinal_shifted_logistic_derived_hier.stan" filename="ordinal\\\_shifted\\\_logistic\\\_derived\\\_hier.stan"}
 ```
 
 ```{r}
 #| warning: false
 #| message: false
-fit <- stan(file="stan_programs/ordered_logistic_comp_derived_hier.stan",
+#| cache: true
+fit <- stan(file="stan_programs/ordinal_shifted_logistic_derived_hier.stan",
             data=data, seed=8438338,
             warmup=1000, iter=2024, refresh=0)
 ```
@@ -2539,6 +2581,7 @@ Otherwise the posterior predictive retrodictions are similarly well
 behaved.
 
 ```{r}
+#| cache: true
 par(mfrow=c(1, 1), mar=c(5, 5, 1, 1))
 
 util$plot_hist_quantiles(samples2, 'y_pred', 0.5, 5.5, 1,
@@ -2546,6 +2589,7 @@ util$plot_hist_quantiles(samples2, 'y_pred', 0.5, 5.5, 1,
 ```
 
 ```{r}
+#| cache: true
 par(mfrow=c(3, 3), mar=c(5, 5, 1, 1))
 
 for (i in 1:data$I) {
@@ -2563,6 +2607,7 @@ for (i in 1:data$I) {
 ```
 
 ```{r}
+#| cache: true
 par(mfrow=c(3, 3), mar=c(5, 5, 1, 1))
 
 for (j in 1:data$J) {

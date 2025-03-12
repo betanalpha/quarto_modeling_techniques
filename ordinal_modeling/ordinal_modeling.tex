@@ -1681,18 +1681,36 @@ model these data.
 \subsubsection{Derived Cut Points}\label{derived-cut-points}
 
 Equivalently we can implement the categorical model by deriving interior
-cut points from the categorical probabilities and then using an ordered
-logit/logistic model. Note that Stan's \texttt{ordered\_logistic} model
-includes a builtin translation of the latent logistic probability
-density function as its first argument that we will fix to zero.
+cut points from the categorical probabilities and then using an ordinal
+model. When modeling homogeneous ordinal probabilities these two steps
+always return the initial categorical probabilities so long as we
+consistently use the same logistic density function for both.
 
 \begin{codelisting}
 
-\caption{\texttt{ordered\textbackslash\_logistic\textbackslash\_derived.stan}}
+\caption{\texttt{ordinal\textbackslash\_logistic\textbackslash\_derived.stan}}
 
 \begin{Shaded}
 \begin{Highlighting}[]
 \KeywordTok{functions}\NormalTok{ \{}
+  \CommentTok{// Ordinal probability mass function assuming a}
+  \CommentTok{// latent standard logistic density function.}
+  \DataTypeTok{real}\NormalTok{ ordinal\_logistic\_lpmf(}\DataTypeTok{int}\NormalTok{[] y, }\DataTypeTok{vector}\NormalTok{ c) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_lpmf(y | p);}
+\NormalTok{  \}}
+
+  \CommentTok{// Ordinal pseudo{-}random number generator assuming}
+  \CommentTok{// a latent standard logistic density function.}
+  \DataTypeTok{int}\NormalTok{ ordinal\_logistic\_rng(}\DataTypeTok{vector}\NormalTok{ c) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_rng(p);}
+\NormalTok{  \}}
+
   \CommentTok{// Derive cut points from baseline probabilities}
   \CommentTok{// and latent logistic density function.}
   \DataTypeTok{vector}\NormalTok{ derived\_cut\_points(}\DataTypeTok{vector}\NormalTok{ p) \{}
@@ -1729,13 +1747,13 @@ density function as its first argument that we will fix to zero.
 \NormalTok{  p \textasciitilde{} dirichlet(rep\_vector(}\DecValTok{1}\NormalTok{, K));}
 
   \CommentTok{// Observational model}
-\NormalTok{  y \textasciitilde{} ordered\_logistic(zeros\_vector(N), cut\_points);}
+\NormalTok{  y \textasciitilde{} ordinal\_logistic(cut\_points);}
 \NormalTok{\}}
 
 \KeywordTok{generated quantities}\NormalTok{ \{}
   \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=K\textgreater{} y\_pred;}
   \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N)}
-\NormalTok{    y\_pred[n] = ordered\_logistic\_rng(}\DecValTok{0}\NormalTok{, cut\_points);}
+\NormalTok{    y\_pred[n] = ordinal\_logistic\_rng(cut\_points);}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
@@ -1744,7 +1762,7 @@ density function as its first argument that we will fix to zero.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordered\_logistic\_derived.stan"}\NormalTok{,}
+\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordinal\_logistic\_derived.stan"}\NormalTok{,}
             \AttributeTok{data=}\NormalTok{data, }\AttributeTok{seed=}\DecValTok{8438338}\NormalTok{,}
             \AttributeTok{warmup=}\DecValTok{1000}\NormalTok{, }\AttributeTok{iter=}\DecValTok{2024}\NormalTok{, }\AttributeTok{refresh=}\DecValTok{0}\NormalTok{)}
 \end{Highlighting}
@@ -1879,10 +1897,30 @@ uniform simplex prior model that we used above!
 
 \begin{codelisting}
 
-\caption{\texttt{ordered\textbackslash\_logistic.stan}}
+\caption{\texttt{ordered\textbackslash\_logistic\textbackslash\_uniform.stan}}
 
 \begin{Shaded}
 \begin{Highlighting}[]
+\KeywordTok{functions}\NormalTok{ \{}
+  \CommentTok{// Ordinal probability mass function assuming a}
+  \CommentTok{// latent standard logistic density function.}
+  \DataTypeTok{real}\NormalTok{ ordinal\_logistic\_lpmf(}\DataTypeTok{int}\NormalTok{[] y, }\DataTypeTok{vector}\NormalTok{ c) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_lpmf(y | p);}
+\NormalTok{  \}}
+
+  \CommentTok{// Ordinal pseudo{-}random number generator assuming}
+  \CommentTok{// a latent standard logistic density function.}
+  \DataTypeTok{int}\NormalTok{ ordinal\_logistic\_rng(}\DataTypeTok{vector}\NormalTok{ c) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_rng(p);}
+\NormalTok{  \}}
+\NormalTok{\}}
+
 \KeywordTok{data}\NormalTok{ \{}
   \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} K;                   }\CommentTok{// Number of ordinal categories}
   \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} N;                   }\CommentTok{// Number of observations}
@@ -1897,13 +1935,13 @@ uniform simplex prior model that we used above!
   \CommentTok{// Implicit uniform prior model}
 
   \CommentTok{// Observational model}
-\NormalTok{  y \textasciitilde{} ordered\_logistic(zeros\_vector(N), cut\_points);}
+\NormalTok{  y \textasciitilde{} ordinal\_logistic(cut\_points);}
 \NormalTok{\}}
 
 \KeywordTok{generated quantities}\NormalTok{ \{}
   \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=K\textgreater{} y\_pred;}
   \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N)}
-\NormalTok{    y\_pred[n] = ordered\_logistic\_rng(}\DecValTok{0}\NormalTok{, cut\_points);}
+\NormalTok{    y\_pred[n] = ordinal\_logistic\_rng(cut\_points);}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
@@ -1912,7 +1950,7 @@ uniform simplex prior model that we used above!
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordered\_logistic.stan"}\NormalTok{,}
+\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordinal\_logistic\_uniform.stan"}\NormalTok{,}
             \AttributeTok{data=}\NormalTok{data, }\AttributeTok{seed=}\DecValTok{8438338}\NormalTok{,}
             \AttributeTok{warmup=}\DecValTok{1000}\NormalTok{, }\AttributeTok{iter=}\DecValTok{2024}\NormalTok{, }\AttributeTok{refresh=}\DecValTok{0}\NormalTok{)}
 \end{Highlighting}
@@ -1973,8 +2011,8 @@ the interior cut points behaviors.
 \end{Shaded}
 
 \begin{verbatim}
-Warning in util$plot_expectand_pushforward(expectand_vals_list[[name]], : 3
-values (0.1%) fell below the histogram binning.
+Warning in util$plot_expectand_pushforward(expectand_vals_list[[name]], : 28
+values (0.7%) fell below the histogram binning.
 \end{verbatim}
 
 \begin{verbatim}
@@ -1991,28 +2029,40 @@ points. Fortunately the induced Dirichlet prior model does just this.
 
 \begin{codelisting}
 
-\caption{\texttt{ordered\textbackslash\_logistic\textbackslash\_induced.stan}}
+\caption{\texttt{ordinal\textbackslash\_logistic\textbackslash\_induced\textbackslash\_dirichlet.stan}}
 
 \begin{Shaded}
 \begin{Highlighting}[]
 \KeywordTok{functions}\NormalTok{ \{}
-  \CommentTok{// Log probability density function over cut point}
+  \CommentTok{// Ordinal probability mass function assuming a}
+  \CommentTok{// latent standard logistic density function.}
+  \DataTypeTok{real}\NormalTok{ ordinal\_logistic\_lpmf(}\DataTypeTok{int}\NormalTok{[] y, }\DataTypeTok{vector}\NormalTok{ c) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_lpmf(y | p);}
+\NormalTok{  \}}
+
+  \CommentTok{// Ordinal pseudo{-}random number generator assuming}
+  \CommentTok{// a latent standard logistic density function.}
+  \DataTypeTok{int}\NormalTok{ ordinal\_logistic\_rng(}\DataTypeTok{vector}\NormalTok{ c) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_rng(p);}
+\NormalTok{  \}}
+
+  \CommentTok{// Log probability density function over cut points}
   \CommentTok{// induced by a Dirichlet probability density function}
-  \CommentTok{// over baseline probabilities and latent logistic}
+  \CommentTok{// over baseline probabilities and a latent logistic}
   \CommentTok{// density function.}
   \DataTypeTok{real}\NormalTok{ induced\_dirichlet\_lpdf(}\DataTypeTok{vector}\NormalTok{ c, }\DataTypeTok{vector}\NormalTok{ alpha) \{}
     \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
     \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c);}
-    \DataTypeTok{vector}\NormalTok{[K] p;}
-    \DataTypeTok{real}\NormalTok{ logJ = }\DecValTok{0}\NormalTok{;}
-
-    \CommentTok{// Induced ordinal probabilities}
-\NormalTok{    p[}\DecValTok{1}\NormalTok{] = Pi[}\DecValTok{1}\NormalTok{];}
-    \ControlFlowTok{for}\NormalTok{ (k }\ControlFlowTok{in} \DecValTok{2}\NormalTok{:(K {-} }\DecValTok{1}\NormalTok{))}
-\NormalTok{      p[k] = Pi[k] {-} Pi[k {-} }\DecValTok{1}\NormalTok{];}
-\NormalTok{    p[K] = }\DecValTok{1}\NormalTok{ {-} Pi[K {-} }\DecValTok{1}\NormalTok{];}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
 
     \CommentTok{// Log Jacobian correction}
+    \DataTypeTok{real}\NormalTok{ logJ = }\DecValTok{0}\NormalTok{;}
     \ControlFlowTok{for}\NormalTok{ (k }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:(K {-} }\DecValTok{1}\NormalTok{)) \{}
       \ControlFlowTok{if}\NormalTok{ (c[k] \textgreater{}= }\DecValTok{0}\NormalTok{)}
 \NormalTok{        logJ += {-}c[k] {-} }\DecValTok{2}\NormalTok{ * log(}\DecValTok{1}\NormalTok{ + exp({-}c[k]));}
@@ -2039,13 +2089,13 @@ points. Fortunately the induced Dirichlet prior model does just this.
 \NormalTok{  cut\_points \textasciitilde{} induced\_dirichlet(rep\_vector(}\DecValTok{1}\NormalTok{, K));}
 
   \CommentTok{// Observational model}
-\NormalTok{  y \textasciitilde{} ordered\_logistic(zeros\_vector(N), cut\_points);}
+\NormalTok{  y \textasciitilde{} ordinal\_logistic(cut\_points);}
 \NormalTok{\}}
 
 \KeywordTok{generated quantities}\NormalTok{ \{}
   \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=K\textgreater{} y\_pred;}
   \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N)}
-\NormalTok{    y\_pred[n] = ordered\_logistic\_rng(}\DecValTok{0}\NormalTok{, cut\_points);}
+\NormalTok{    y\_pred[n] = ordinal\_logistic\_rng(cut\_points);}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
@@ -2054,7 +2104,7 @@ points. Fortunately the induced Dirichlet prior model does just this.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordered\_logistic\_induced.stan"}\NormalTok{,}
+\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordinal\_logistic\_induced\_dirichlet.stan"}\NormalTok{,}
             \AttributeTok{data=}\NormalTok{data, }\AttributeTok{seed=}\DecValTok{8438338}\NormalTok{,}
             \AttributeTok{warmup=}\DecValTok{1000}\NormalTok{, }\AttributeTok{iter=}\DecValTok{2024}\NormalTok{, }\AttributeTok{refresh=}\DecValTok{0}\NormalTok{)}
 \end{Highlighting}
@@ -2114,8 +2164,8 @@ Inferences for the interior cut points are well-behaved.
 
 \includegraphics{ordinal_modeling_files/figure-pdf/unnamed-chunk-26-1.pdf}
 
-In fact comparing to the \texttt{ordered\_logistic\_derived} model the
-inferences for the interior cut points are identical.
+In fact the inferences for the interior cut points are identical to
+those from the \texttt{ordinal\_logistic\_derived} model.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -2137,16 +2187,6 @@ inferences for the interior cut points are identical.
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
-
-\begin{verbatim}
-Warning in util$plot_expectand_pushforward(samples2[[name]], 35, flim = c(-6.5,
-: 1 value (0.0%) fell below the histogram binning.
-\end{verbatim}
-
-\begin{verbatim}
-Warning in util$plot_expectand_pushforward(samples2[[name]], 35, flim = c(-6.5,
-: 0 value (0.0%) fell above the histogram binning.
-\end{verbatim}
 
 \includegraphics{ordinal_modeling_files/figure-pdf/unnamed-chunk-27-1.pdf}
 
@@ -2275,11 +2315,29 @@ well.
 
 \begin{codelisting}
 
-\caption{\texttt{ordered\textbackslash\_logistic\textbackslash\_derived.stan}}
+\caption{\texttt{ordinal\textbackslash\_logistic\textbackslash\_derived.stan}}
 
 \begin{Shaded}
 \begin{Highlighting}[]
 \KeywordTok{functions}\NormalTok{ \{}
+  \CommentTok{// Ordinal probability mass function assuming a}
+  \CommentTok{// latent standard logistic density function.}
+  \DataTypeTok{real}\NormalTok{ ordinal\_logistic\_lpmf(}\DataTypeTok{int}\NormalTok{[] y, }\DataTypeTok{vector}\NormalTok{ c) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_lpmf(y | p);}
+\NormalTok{  \}}
+
+  \CommentTok{// Ordinal pseudo{-}random number generator assuming}
+  \CommentTok{// a latent standard logistic density function.}
+  \DataTypeTok{int}\NormalTok{ ordinal\_logistic\_rng(}\DataTypeTok{vector}\NormalTok{ c) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_rng(p);}
+\NormalTok{  \}}
+
   \CommentTok{// Derive cut points from baseline probabilities}
   \CommentTok{// and latent logistic density function.}
   \DataTypeTok{vector}\NormalTok{ derived\_cut\_points(}\DataTypeTok{vector}\NormalTok{ p) \{}
@@ -2316,13 +2374,13 @@ well.
 \NormalTok{  p \textasciitilde{} dirichlet(rep\_vector(}\DecValTok{1}\NormalTok{, K));}
 
   \CommentTok{// Observational model}
-\NormalTok{  y \textasciitilde{} ordered\_logistic(zeros\_vector(N), cut\_points);}
+\NormalTok{  y \textasciitilde{} ordinal\_logistic(cut\_points);}
 \NormalTok{\}}
 
 \KeywordTok{generated quantities}\NormalTok{ \{}
   \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=K\textgreater{} y\_pred;}
   \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N)}
-\NormalTok{    y\_pred[n] = ordered\_logistic\_rng(}\DecValTok{0}\NormalTok{, cut\_points);}
+\NormalTok{    y\_pred[n] = ordinal\_logistic\_rng(cut\_points);}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
@@ -2331,7 +2389,7 @@ well.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordered\_logistic\_derived.stan"}\NormalTok{,}
+\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordinal\_logistic\_derived.stan"}\NormalTok{,}
             \AttributeTok{data=}\NormalTok{data, }\AttributeTok{seed=}\DecValTok{8438338}\NormalTok{,}
             \AttributeTok{warmup=}\DecValTok{1000}\NormalTok{, }\AttributeTok{iter=}\DecValTok{2024}\NormalTok{, }\AttributeTok{refresh=}\DecValTok{0}\NormalTok{)}
 \end{Highlighting}
@@ -2395,8 +2453,8 @@ Markov chain Monte Carlo estimation.
 \end{Shaded}
 
 \begin{verbatim}
-Warning in util$plot_expectand_pushforward(expectand_vals_list[[name]], : 6
-values (0.1%) fell below the histogram binning.
+Warning in util$plot_expectand_pushforward(expectand_vals_list[[name]], : 9
+values (0.2%) fell below the histogram binning.
 \end{verbatim}
 
 \begin{verbatim}
@@ -2414,10 +2472,30 @@ before. Will our sloppiness continue to go unpunished?
 
 \begin{codelisting}
 
-\caption{\texttt{ordered\textbackslash\_logistic.stan}}
+\caption{\texttt{ordinal\textbackslash\_logistic\textbackslash\_uniform.stan}}
 
 \begin{Shaded}
 \begin{Highlighting}[]
+\KeywordTok{functions}\NormalTok{ \{}
+  \CommentTok{// Ordinal probability mass function assuming a}
+  \CommentTok{// latent standard logistic density function.}
+  \DataTypeTok{real}\NormalTok{ ordinal\_logistic\_lpmf(}\DataTypeTok{int}\NormalTok{[] y, }\DataTypeTok{vector}\NormalTok{ c) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_lpmf(y | p);}
+\NormalTok{  \}}
+
+  \CommentTok{// Ordinal pseudo{-}random number generator assuming}
+  \CommentTok{// a latent standard logistic density function.}
+  \DataTypeTok{int}\NormalTok{ ordinal\_logistic\_rng(}\DataTypeTok{vector}\NormalTok{ c) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_rng(p);}
+\NormalTok{  \}}
+\NormalTok{\}}
+
 \KeywordTok{data}\NormalTok{ \{}
   \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} K;                   }\CommentTok{// Number of ordinal categories}
   \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} N;                   }\CommentTok{// Number of observations}
@@ -2432,13 +2510,13 @@ before. Will our sloppiness continue to go unpunished?
   \CommentTok{// Implicit uniform prior model}
 
   \CommentTok{// Observational model}
-\NormalTok{  y \textasciitilde{} ordered\_logistic(zeros\_vector(N), cut\_points);}
+\NormalTok{  y \textasciitilde{} ordinal\_logistic(cut\_points);}
 \NormalTok{\}}
 
 \KeywordTok{generated quantities}\NormalTok{ \{}
   \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=K\textgreater{} y\_pred;}
   \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N)}
-\NormalTok{    y\_pred[n] = ordered\_logistic\_rng(}\DecValTok{0}\NormalTok{, cut\_points);}
+\NormalTok{    y\_pred[n] = ordinal\_logistic\_rng(cut\_points);}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
@@ -2447,7 +2525,7 @@ before. Will our sloppiness continue to go unpunished?
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordered\_logistic.stan"}\NormalTok{,}
+\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordinal\_logistic\_uniform.stan"}\NormalTok{,}
             \AttributeTok{data=}\NormalTok{data, }\AttributeTok{seed=}\DecValTok{8438338}\NormalTok{,}
             \AttributeTok{warmup=}\DecValTok{1000}\NormalTok{, }\AttributeTok{iter=}\DecValTok{2024}\NormalTok{, }\AttributeTok{refresh=}\DecValTok{0}\NormalTok{)}
 \end{Highlighting}
@@ -2464,19 +2542,27 @@ and slow exploration, especially for the first interior cut point.
 \end{Shaded}
 
 \begin{verbatim}
-  Chain 1: 379 of 1024 transitions (37.01%)
+  Chain 1: 799 of 1024 transitions (78.03%)
            saturated the maximum treedepth of 10.
-  Chain 1: Average proxy acceptance statistic (0.456)
+
+  Chain 2: 576 of 1024 transitions (56.25%)
+           saturated the maximum treedepth of 10.
+  Chain 2: Average proxy acceptance statistic (0.515)
            is smaller than 90% of the target (0.801).
 
-  Chain 2: 785 of 1024 transitions (76.66%)
+  Chain 3: 11 of 1024 transitions (1.1%) diverged.
+  Chain 3: 885 of 1024 transitions (86.43%)
            saturated the maximum treedepth of 10.
 
-  Chain 3: 939 of 1024 transitions (91.70%)
+  Chain 4: 823 of 1024 transitions (80.37%)
            saturated the maximum treedepth of 10.
 
-  Chain 4: 945 of 1024 transitions (92.29%)
-           saturated the maximum treedepth of 10.
+  Divergent Hamiltonian transitions result from unstable numerical
+trajectories.  These instabilities are often due to degenerate target
+geometry, especially "pinches".  If there are only a small number of
+divergences then running with adept_delta larger than 0.801 may reduce
+the instabilities at the cost of more expensive Hamiltonian
+transitions.
 
   Numerical trajectories that saturate the maximum treedepth have
 terminated prematurely.  Increasing max_depth above 10 should result in
@@ -2499,27 +2585,18 @@ This is often due to discontinuous or imprecise gradients.
 
 \begin{verbatim}
 cut_points[1]:
-  Split hat{R} (2.867) exceeds 1.1.
-  Chain 1: hat{ESS} (6.005) is smaller than desired (100).
-  Chain 2: hat{ESS} (34.274) is smaller than desired (100).
-  Chain 3: hat{ESS} (7.406) is smaller than desired (100).
-  Chain 4: hat{ESS} (9.384) is smaller than desired (100).
+  Split hat{R} (1.539) exceeds 1.1.
+  Chain 1: hat{ESS} (93.587) is smaller than desired (100).
+  Chain 2: hat{ESS} (5.799) is smaller than desired (100).
+  Chain 3: hat{ESS} (5.555) is smaller than desired (100).
+  Chain 4: hat{ESS} (35.367) is smaller than desired (100).
 
 cut_points[2]:
-  Split hat{R} (1.124) exceeds 1.1.
-  Chain 1: hat{ESS} (31.207) is smaller than desired (100).
-  Chain 3: hat{ESS} (10.978) is smaller than desired (100).
-  Chain 4: hat{ESS} (56.937) is smaller than desired (100).
-
-cut_points[3]:
-  Split hat{R} (1.156) exceeds 1.1.
-  Chain 1: hat{ESS} (10.601) is smaller than desired (100).
+  Chain 3: hat{ESS} (48.028) is smaller than desired (100).
 
 cut_points[4]:
-  Split hat{R} (1.182) exceeds 1.1.
-  Chain 1: hat{ESS} (8.968) is smaller than desired (100).
-  Chain 3: hat{ESS} (20.561) is smaller than desired (100).
-  Chain 4: hat{ESS} (86.322) is smaller than desired (100).
+  Chain 2: hat{ESS} (17.348) is smaller than desired (100).
+  Chain 3: hat{ESS} (79.670) is smaller than desired (100).
 
 
 Split Rhat larger than 1.1 suggests that at least one of the Markov
@@ -2565,7 +2642,7 @@ get only so far in finite time.
 \includegraphics{ordinal_modeling_files/figure-pdf/unnamed-chunk-43-1.pdf}
 
 The reason we didn't see problems when using the \texttt{categorical}
-and \texttt{ordered\_logistic\_derived} models is that they employed a
+and \texttt{ordinal\_logistic\_derived} models is that they employed a
 more informative prior model. Again uniformity over the interior cut
 points is not equivalent to uniformity over the ordinal probabilities!
 
@@ -2574,28 +2651,40 @@ induced Dirichlet probability density function.
 
 \begin{codelisting}
 
-\caption{\texttt{ordered\textbackslash\_logistic\textbackslash\_induced.stan}}
+\caption{\texttt{ordinal\textbackslash\_logistic\textbackslash\_induced\textbackslash\_dirichlet.stan}}
 
 \begin{Shaded}
 \begin{Highlighting}[]
 \KeywordTok{functions}\NormalTok{ \{}
-  \CommentTok{// Log probability density function over cut point}
+  \CommentTok{// Ordinal probability mass function assuming a}
+  \CommentTok{// latent standard logistic density function.}
+  \DataTypeTok{real}\NormalTok{ ordinal\_logistic\_lpmf(}\DataTypeTok{int}\NormalTok{[] y, }\DataTypeTok{vector}\NormalTok{ c) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_lpmf(y | p);}
+\NormalTok{  \}}
+
+  \CommentTok{// Ordinal pseudo{-}random number generator assuming}
+  \CommentTok{// a latent standard logistic density function.}
+  \DataTypeTok{int}\NormalTok{ ordinal\_logistic\_rng(}\DataTypeTok{vector}\NormalTok{ c) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_rng(p);}
+\NormalTok{  \}}
+
+  \CommentTok{// Log probability density function over cut points}
   \CommentTok{// induced by a Dirichlet probability density function}
-  \CommentTok{// over baseline probabilities and latent logistic}
+  \CommentTok{// over baseline probabilities and a latent logistic}
   \CommentTok{// density function.}
   \DataTypeTok{real}\NormalTok{ induced\_dirichlet\_lpdf(}\DataTypeTok{vector}\NormalTok{ c, }\DataTypeTok{vector}\NormalTok{ alpha) \{}
     \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
     \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c);}
-    \DataTypeTok{vector}\NormalTok{[K] p;}
-    \DataTypeTok{real}\NormalTok{ logJ = }\DecValTok{0}\NormalTok{;}
-
-    \CommentTok{// Induced ordinal probabilities}
-\NormalTok{    p[}\DecValTok{1}\NormalTok{] = Pi[}\DecValTok{1}\NormalTok{];}
-    \ControlFlowTok{for}\NormalTok{ (k }\ControlFlowTok{in} \DecValTok{2}\NormalTok{:(K {-} }\DecValTok{1}\NormalTok{))}
-\NormalTok{      p[k] = Pi[k] {-} Pi[k {-} }\DecValTok{1}\NormalTok{];}
-\NormalTok{    p[K] = }\DecValTok{1}\NormalTok{ {-} Pi[K {-} }\DecValTok{1}\NormalTok{];}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
 
     \CommentTok{// Log Jacobian correction}
+    \DataTypeTok{real}\NormalTok{ logJ = }\DecValTok{0}\NormalTok{;}
     \ControlFlowTok{for}\NormalTok{ (k }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:(K {-} }\DecValTok{1}\NormalTok{)) \{}
       \ControlFlowTok{if}\NormalTok{ (c[k] \textgreater{}= }\DecValTok{0}\NormalTok{)}
 \NormalTok{        logJ += {-}c[k] {-} }\DecValTok{2}\NormalTok{ * log(}\DecValTok{1}\NormalTok{ + exp({-}c[k]));}
@@ -2622,13 +2711,13 @@ induced Dirichlet probability density function.
 \NormalTok{  cut\_points \textasciitilde{} induced\_dirichlet(rep\_vector(}\DecValTok{1}\NormalTok{, K));}
 
   \CommentTok{// Observational model}
-\NormalTok{  y \textasciitilde{} ordered\_logistic(zeros\_vector(N), cut\_points);}
+\NormalTok{  y \textasciitilde{} ordinal\_logistic(cut\_points);}
 \NormalTok{\}}
 
 \KeywordTok{generated quantities}\NormalTok{ \{}
   \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=K\textgreater{} y\_pred;}
   \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N)}
-\NormalTok{    y\_pred[n] = ordered\_logistic\_rng(}\DecValTok{0}\NormalTok{, cut\_points);}
+\NormalTok{    y\_pred[n] = ordinal\_logistic\_rng(cut\_points);}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
@@ -2637,7 +2726,7 @@ induced Dirichlet probability density function.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordered\_logistic\_induced.stan"}\NormalTok{,}
+\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordinal\_logistic\_induced\_dirichlet.stan"}\NormalTok{,}
             \AttributeTok{data=}\NormalTok{data, }\AttributeTok{seed=}\DecValTok{8438338}\NormalTok{,}
             \AttributeTok{warmup=}\DecValTok{1000}\NormalTok{, }\AttributeTok{iter=}\DecValTok{2024}\NormalTok{, }\AttributeTok{refresh=}\DecValTok{0}\NormalTok{)}
 \end{Highlighting}
@@ -2696,8 +2785,8 @@ Posterior inferences for all of the interior cut points are clean.
 \end{Shaded}
 
 \begin{verbatim}
-Warning in util$plot_expectand_pushforward(expectand_vals_list[[name]], : 2
-values (0.0%) fell below the histogram binning.
+Warning in util$plot_expectand_pushforward(expectand_vals_list[[name]], : 4
+values (0.1%) fell below the histogram binning.
 \end{verbatim}
 
 \begin{verbatim}
@@ -2733,7 +2822,7 @@ regardless of which approach we take.
 
 \begin{verbatim}
 Warning in util$plot_expectand_pushforward(samples2[[name]], 35, flim = c(-10,
-: 6 values (0.1%) fell below the histogram binning.
+: 9 values (0.2%) fell below the histogram binning.
 \end{verbatim}
 
 \begin{verbatim}
@@ -2743,7 +2832,7 @@ Warning in util$plot_expectand_pushforward(samples2[[name]], 35, flim = c(-10,
 
 \begin{verbatim}
 Warning in util$plot_expectand_pushforward(samples4[[name]], 35, flim = c(-10,
-: 2 values (0.0%) fell below the histogram binning.
+: 4 values (0.1%) fell below the histogram binning.
 \end{verbatim}
 
 \begin{verbatim}
@@ -2835,19 +2924,48 @@ data exhibits clear differences in behavior across the items.
 Model}\label{ill-defined-uniform-prior-model}
 
 In order to infer the individual item qualities we can use an ordinal
-pairwise modeling approach. Once again we'll start with an ill-defined
-uniform prior model over the interior cut points.
+pairwise modeling approach, with the item qualities shifting the latent
+logistic density function away from its baseline location. Because the
+shifts will generally vary across observations I have implemented the
+\texttt{ordinal\_shifted\_logistic} for one observation at a time,
+requiring a loop in the observational model.
+
+Once again we'll start with an ill-defined uniform prior model, this
+time over both the interior cut points and the item qualities.
 
 \begin{codelisting}
 
-\caption{\texttt{ordered\textbackslash\_logistic\textbackslash\_comp\_uniform.stan}}
+\caption{\texttt{ordinal\textbackslash\_shifted\textbackslash\_logistic\textbackslash\_uniform.stan}}
 
 \begin{Shaded}
 \begin{Highlighting}[]
+\KeywordTok{functions}\NormalTok{ \{}
+  \CommentTok{// Ordinal probability mass function assuming a}
+  \CommentTok{// latent shifted logistic density function.}
+  \CommentTok{//}
+  \CommentTok{// Positive gamma shifts baseline ordinal}
+  \CommentTok{// probabilities towards larger values.}
+  \DataTypeTok{real}\NormalTok{ ordinal\_shifted\_logistic\_lpmf(}\DataTypeTok{int}\NormalTok{ y, }\DataTypeTok{vector}\NormalTok{ c, }\DataTypeTok{real}\NormalTok{ gamma) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c {-} gamma);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_lpmf(y | p);}
+\NormalTok{  \}}
+
+  \CommentTok{// Ordinal pseudo{-}random number generator assuming}
+  \CommentTok{// a latent standard logistic density function.}
+  \DataTypeTok{int}\NormalTok{ ordinal\_shifted\_logistic\_rng(}\DataTypeTok{vector}\NormalTok{ c, }\DataTypeTok{real}\NormalTok{ gamma) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c {-} gamma);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_rng(p);}
+\NormalTok{  \}}
+\NormalTok{\}}
+
 \KeywordTok{data}\NormalTok{ \{}
-  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} I;                   }\CommentTok{// Number of items}
-  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} K;                   }\CommentTok{// Number of ordinal categories}
-  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} N;                   }\CommentTok{// Number of observations}
+  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} I; }\CommentTok{// Number of items}
+  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} K; }\CommentTok{// Number of ordinal categories}
+  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} N; }\CommentTok{// Number of observations}
 
   \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=I\textgreater{} item\_idx; }\CommentTok{// Observed items}
   \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=K\textgreater{} y;        }\CommentTok{// Observed categories}
@@ -2857,11 +2975,20 @@ uniform prior model over the interior cut points.
   \DataTypeTok{vector}\NormalTok{[I] gamma;           }\CommentTok{// Item qualities}
   \DataTypeTok{ordered}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] cut\_points; }\CommentTok{// Interior cut points}
 \NormalTok{\}}
+
 \KeywordTok{model}\NormalTok{ \{}
   \CommentTok{// Implicit uniform prior model}
-  
+
   \CommentTok{// Observational model}
-\NormalTok{  y \textasciitilde{} ordered\_logistic(gamma[item\_idx], cut\_points);}
+  \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N)}
+\NormalTok{    y[n] \textasciitilde{} ordinal\_shifted\_logistic(cut\_points, gamma[item\_idx[n]]);}
+\NormalTok{\}}
+
+\KeywordTok{generated quantities}\NormalTok{ \{}
+  \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=K\textgreater{} y\_pred;}
+  \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N)}
+\NormalTok{    y\_pred[n] = ordinal\_shifted\_logistic\_rng(cut\_points,}
+\NormalTok{                                             gamma[item\_idx[n]]);}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
@@ -2870,7 +2997,7 @@ uniform prior model over the interior cut points.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordered\_logistic\_comp\_uniform.stan"}\NormalTok{,}
+\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordinal\_shifted\_logistic\_uniform.stan"}\NormalTok{,}
             \AttributeTok{data=}\NormalTok{data, }\AttributeTok{seed=}\DecValTok{8438338}\NormalTok{,}
             \AttributeTok{warmup=}\DecValTok{1000}\NormalTok{, }\AttributeTok{iter=}\DecValTok{2024}\NormalTok{, }\AttributeTok{refresh=}\DecValTok{0}\NormalTok{)}
 \end{Highlighting}
@@ -2888,16 +3015,16 @@ strong inferential degeneracies.
 \end{Shaded}
 
 \begin{verbatim}
-  Chain 1: 540 of 1024 transitions (52.73%)
+  Chain 1: 419 of 1024 transitions (40.92%)
            saturated the maximum treedepth of 10.
 
-  Chain 2: 552 of 1024 transitions (53.91%)
+  Chain 2: 469 of 1024 transitions (45.80%)
            saturated the maximum treedepth of 10.
 
-  Chain 3: 572 of 1024 transitions (55.86%)
+  Chain 3: 594 of 1024 transitions (58.01%)
            saturated the maximum treedepth of 10.
 
-  Chain 4: 590 of 1024 transitions (57.62%)
+  Chain 4: 494 of 1024 transitions (48.24%)
            saturated the maximum treedepth of 10.
 
   Numerical trajectories that saturate the maximum treedepth have
@@ -2918,95 +3045,95 @@ more expensive, but more efficient, Hamiltonian transitions.
 
 \begin{verbatim}
 gamma[1]:
-  Split hat{R} (3.066) exceeds 1.1.
-  Chain 1: hat{ESS} (5.924) is smaller than desired (100).
-  Chain 2: hat{ESS} (6.574) is smaller than desired (100).
-  Chain 3: hat{ESS} (5.199) is smaller than desired (100).
-  Chain 4: hat{ESS} (5.485) is smaller than desired (100).
+  Split hat{R} (4.186) exceeds 1.1.
+  Chain 1: hat{ESS} (5.567) is smaller than desired (100).
+  Chain 2: hat{ESS} (7.804) is smaller than desired (100).
+  Chain 3: hat{ESS} (9.657) is smaller than desired (100).
+  Chain 4: hat{ESS} (5.225) is smaller than desired (100).
 
 gamma[2]:
-  Split hat{R} (3.066) exceeds 1.1.
-  Chain 1: hat{ESS} (5.923) is smaller than desired (100).
-  Chain 2: hat{ESS} (6.576) is smaller than desired (100).
-  Chain 3: hat{ESS} (5.196) is smaller than desired (100).
-  Chain 4: hat{ESS} (5.485) is smaller than desired (100).
+  Split hat{R} (4.186) exceeds 1.1.
+  Chain 1: hat{ESS} (5.565) is smaller than desired (100).
+  Chain 2: hat{ESS} (7.804) is smaller than desired (100).
+  Chain 3: hat{ESS} (9.650) is smaller than desired (100).
+  Chain 4: hat{ESS} (5.224) is smaller than desired (100).
 
 gamma[3]:
-  Split hat{R} (3.066) exceeds 1.1.
-  Chain 1: hat{ESS} (5.924) is smaller than desired (100).
-  Chain 2: hat{ESS} (6.575) is smaller than desired (100).
-  Chain 3: hat{ESS} (5.199) is smaller than desired (100).
-  Chain 4: hat{ESS} (5.485) is smaller than desired (100).
+  Split hat{R} (4.186) exceeds 1.1.
+  Chain 1: hat{ESS} (5.567) is smaller than desired (100).
+  Chain 2: hat{ESS} (7.806) is smaller than desired (100).
+  Chain 3: hat{ESS} (9.656) is smaller than desired (100).
+  Chain 4: hat{ESS} (5.225) is smaller than desired (100).
 
 gamma[4]:
-  Split hat{R} (3.066) exceeds 1.1.
-  Chain 1: hat{ESS} (5.924) is smaller than desired (100).
-  Chain 2: hat{ESS} (6.576) is smaller than desired (100).
-  Chain 3: hat{ESS} (5.197) is smaller than desired (100).
-  Chain 4: hat{ESS} (5.485) is smaller than desired (100).
+  Split hat{R} (4.186) exceeds 1.1.
+  Chain 1: hat{ESS} (5.567) is smaller than desired (100).
+  Chain 2: hat{ESS} (7.804) is smaller than desired (100).
+  Chain 3: hat{ESS} (9.652) is smaller than desired (100).
+  Chain 4: hat{ESS} (5.224) is smaller than desired (100).
 
 gamma[5]:
-  Split hat{R} (3.066) exceeds 1.1.
-  Chain 1: hat{ESS} (5.924) is smaller than desired (100).
-  Chain 2: hat{ESS} (6.576) is smaller than desired (100).
-  Chain 3: hat{ESS} (5.196) is smaller than desired (100).
-  Chain 4: hat{ESS} (5.485) is smaller than desired (100).
+  Split hat{R} (4.186) exceeds 1.1.
+  Chain 1: hat{ESS} (5.567) is smaller than desired (100).
+  Chain 2: hat{ESS} (7.802) is smaller than desired (100).
+  Chain 3: hat{ESS} (9.655) is smaller than desired (100).
+  Chain 4: hat{ESS} (5.225) is smaller than desired (100).
 
 gamma[6]:
-  Split hat{R} (3.066) exceeds 1.1.
-  Chain 1: hat{ESS} (5.925) is smaller than desired (100).
-  Chain 2: hat{ESS} (6.574) is smaller than desired (100).
-  Chain 3: hat{ESS} (5.199) is smaller than desired (100).
-  Chain 4: hat{ESS} (5.485) is smaller than desired (100).
+  Split hat{R} (4.186) exceeds 1.1.
+  Chain 1: hat{ESS} (5.568) is smaller than desired (100).
+  Chain 2: hat{ESS} (7.806) is smaller than desired (100).
+  Chain 3: hat{ESS} (9.659) is smaller than desired (100).
+  Chain 4: hat{ESS} (5.225) is smaller than desired (100).
 
 gamma[7]:
-  Split hat{R} (3.066) exceeds 1.1.
-  Chain 1: hat{ESS} (5.923) is smaller than desired (100).
-  Chain 2: hat{ESS} (6.576) is smaller than desired (100).
-  Chain 3: hat{ESS} (5.195) is smaller than desired (100).
-  Chain 4: hat{ESS} (5.486) is smaller than desired (100).
+  Split hat{R} (4.186) exceeds 1.1.
+  Chain 1: hat{ESS} (5.565) is smaller than desired (100).
+  Chain 2: hat{ESS} (7.802) is smaller than desired (100).
+  Chain 3: hat{ESS} (9.650) is smaller than desired (100).
+  Chain 4: hat{ESS} (5.224) is smaller than desired (100).
 
 gamma[8]:
-  Split hat{R} (3.066) exceeds 1.1.
-  Chain 1: hat{ESS} (5.921) is smaller than desired (100).
-  Chain 2: hat{ESS} (6.578) is smaller than desired (100).
-  Chain 3: hat{ESS} (5.194) is smaller than desired (100).
-  Chain 4: hat{ESS} (5.485) is smaller than desired (100).
+  Split hat{R} (4.186) exceeds 1.1.
+  Chain 1: hat{ESS} (5.566) is smaller than desired (100).
+  Chain 2: hat{ESS} (7.805) is smaller than desired (100).
+  Chain 3: hat{ESS} (9.648) is smaller than desired (100).
+  Chain 4: hat{ESS} (5.224) is smaller than desired (100).
 
 gamma[9]:
-  Split hat{R} (3.066) exceeds 1.1.
-  Chain 1: hat{ESS} (5.924) is smaller than desired (100).
-  Chain 2: hat{ESS} (6.576) is smaller than desired (100).
-  Chain 3: hat{ESS} (5.197) is smaller than desired (100).
-  Chain 4: hat{ESS} (5.485) is smaller than desired (100).
+  Split hat{R} (4.186) exceeds 1.1.
+  Chain 1: hat{ESS} (5.567) is smaller than desired (100).
+  Chain 2: hat{ESS} (7.804) is smaller than desired (100).
+  Chain 3: hat{ESS} (9.655) is smaller than desired (100).
+  Chain 4: hat{ESS} (5.224) is smaller than desired (100).
 
 cut_points[1]:
-  Split hat{R} (3.066) exceeds 1.1.
-  Chain 1: hat{ESS} (5.921) is smaller than desired (100).
-  Chain 2: hat{ESS} (6.580) is smaller than desired (100).
-  Chain 3: hat{ESS} (5.192) is smaller than desired (100).
-  Chain 4: hat{ESS} (5.486) is smaller than desired (100).
+  Split hat{R} (4.186) exceeds 1.1.
+  Chain 1: hat{ESS} (5.566) is smaller than desired (100).
+  Chain 2: hat{ESS} (7.802) is smaller than desired (100).
+  Chain 3: hat{ESS} (9.653) is smaller than desired (100).
+  Chain 4: hat{ESS} (5.223) is smaller than desired (100).
 
 cut_points[2]:
-  Split hat{R} (3.066) exceeds 1.1.
-  Chain 1: hat{ESS} (5.924) is smaller than desired (100).
-  Chain 2: hat{ESS} (6.575) is smaller than desired (100).
-  Chain 3: hat{ESS} (5.196) is smaller than desired (100).
-  Chain 4: hat{ESS} (5.485) is smaller than desired (100).
+  Split hat{R} (4.186) exceeds 1.1.
+  Chain 1: hat{ESS} (5.567) is smaller than desired (100).
+  Chain 2: hat{ESS} (7.803) is smaller than desired (100).
+  Chain 3: hat{ESS} (9.651) is smaller than desired (100).
+  Chain 4: hat{ESS} (5.224) is smaller than desired (100).
 
 cut_points[3]:
-  Split hat{R} (3.066) exceeds 1.1.
-  Chain 1: hat{ESS} (5.926) is smaller than desired (100).
-  Chain 2: hat{ESS} (6.574) is smaller than desired (100).
-  Chain 3: hat{ESS} (5.200) is smaller than desired (100).
-  Chain 4: hat{ESS} (5.485) is smaller than desired (100).
+  Split hat{R} (4.186) exceeds 1.1.
+  Chain 1: hat{ESS} (5.568) is smaller than desired (100).
+  Chain 2: hat{ESS} (7.804) is smaller than desired (100).
+  Chain 3: hat{ESS} (9.652) is smaller than desired (100).
+  Chain 4: hat{ESS} (5.225) is smaller than desired (100).
 
 cut_points[4]:
-  Split hat{R} (3.066) exceeds 1.1.
-  Chain 1: hat{ESS} (5.924) is smaller than desired (100).
-  Chain 2: hat{ESS} (6.576) is smaller than desired (100).
-  Chain 3: hat{ESS} (5.200) is smaller than desired (100).
-  Chain 4: hat{ESS} (5.485) is smaller than desired (100).
+  Split hat{R} (4.186) exceeds 1.1.
+  Chain 1: hat{ESS} (5.567) is smaller than desired (100).
+  Chain 2: hat{ESS} (7.806) is smaller than desired (100).
+  Chain 3: hat{ESS} (9.661) is smaller than desired (100).
+  Chain 4: hat{ESS} (5.225) is smaller than desired (100).
 
 
 Split Rhat larger than 1.1 suggests that at least one of the Markov
@@ -3050,14 +3177,37 @@ items to zero so that \(\gamma_{i_{b}} = 0\) defines the baseline.
 
 \begin{codelisting}
 
-\caption{\texttt{ordered\textbackslash\_logistic\textbackslash\_comp\textbackslash\_anchor.stan}}
+\caption{\texttt{ordinal\textbackslash\_shifted\textbackslash\_logistic\textbackslash\_anchor.stan}}
 
 \begin{Shaded}
 \begin{Highlighting}[]
+\KeywordTok{functions}\NormalTok{ \{}
+  \CommentTok{// Ordinal probability mass function assuming a}
+  \CommentTok{// latent shifted logistic density function.}
+  \CommentTok{//}
+  \CommentTok{// Positive gamma shifts baseline ordinal}
+  \CommentTok{// probabilities towards larger values.}
+  \DataTypeTok{real}\NormalTok{ ordinal\_shifted\_logistic\_lpmf(}\DataTypeTok{int}\NormalTok{ y, }\DataTypeTok{vector}\NormalTok{ c, }\DataTypeTok{real}\NormalTok{ gamma) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c {-} gamma);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_lpmf(y | p);}
+\NormalTok{  \}}
+
+  \CommentTok{// Ordinal pseudo{-}random number generator assuming}
+  \CommentTok{// a latent standard logistic density function.}
+  \DataTypeTok{int}\NormalTok{ ordinal\_shifted\_logistic\_rng(}\DataTypeTok{vector}\NormalTok{ c, }\DataTypeTok{real}\NormalTok{ gamma) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c {-} gamma);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_rng(p);}
+\NormalTok{  \}}
+\NormalTok{\}}
+
 \KeywordTok{data}\NormalTok{ \{}
-  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} I;                   }\CommentTok{// Number of items}
-  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} K;                   }\CommentTok{// Number of ordinal categories}
-  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} N;                   }\CommentTok{// Number of observations}
+  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} I; }\CommentTok{// Number of items}
+  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} K; }\CommentTok{// Number of ordinal categories}
+  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} N; }\CommentTok{// Number of observations}
 
   \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=I\textgreater{} item\_idx; }\CommentTok{// Observed items}
   \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=K\textgreater{} y;        }\CommentTok{// Observed categories}
@@ -3076,13 +3226,15 @@ items to zero so that \(\gamma_{i_{b}} = 0\) defines the baseline.
   \CommentTok{// Implicit uniform prior model}
   
   \CommentTok{// Observational model}
-\NormalTok{  y \textasciitilde{} ordered\_logistic(gamma[item\_idx], cut\_points);}
+  \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N)}
+\NormalTok{    y[n] \textasciitilde{} ordinal\_shifted\_logistic(cut\_points, gamma[item\_idx[n]]);}
 \NormalTok{\}}
 
 \KeywordTok{generated quantities}\NormalTok{ \{}
   \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=K\textgreater{} y\_pred;}
   \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N)}
-\NormalTok{    y\_pred[n] = ordered\_logistic\_rng(gamma[item\_idx[n]], cut\_points);}
+\NormalTok{    y\_pred[n] = ordinal\_shifted\_logistic\_rng(cut\_points,}
+\NormalTok{                                             gamma[item\_idx[n]]);}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
@@ -3091,7 +3243,7 @@ items to zero so that \(\gamma_{i_{b}} = 0\) defines the baseline.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordered\_logistic\_comp\_anchor.stan"}\NormalTok{,}
+\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordinal\_shifted\_logistic\_anchor.stan"}\NormalTok{,}
             \AttributeTok{data=}\NormalTok{data, }\AttributeTok{seed=}\DecValTok{8438338}\NormalTok{,}
             \AttributeTok{warmup=}\DecValTok{1000}\NormalTok{, }\AttributeTok{iter=}\DecValTok{2024}\NormalTok{, }\AttributeTok{refresh=}\DecValTok{0}\NormalTok{)}
 \end{Highlighting}
@@ -3197,28 +3349,43 @@ behaviors.
 
 \begin{codelisting}
 
-\caption{\texttt{ordered\textbackslash\_logistic\textbackslash\_comp\textbackslash\_induced.stan}}
+\caption{\texttt{ordinal\textbackslash\_shifted\textbackslash\_logistic\textbackslash\_induced\textbackslash\_dirichlet.stan}}
 
 \begin{Shaded}
 \begin{Highlighting}[]
 \KeywordTok{functions}\NormalTok{ \{}
-  \CommentTok{// Log probability density function over cut point}
+  \CommentTok{// Ordinal probability mass function assuming a}
+  \CommentTok{// latent shifted logistic density function.}
+  \CommentTok{//}
+  \CommentTok{// Positive gamma shifts baseline ordinal}
+  \CommentTok{// probabilities towards larger values.}
+  \DataTypeTok{real}\NormalTok{ ordinal\_shifted\_logistic\_lpmf(}\DataTypeTok{int}\NormalTok{ y, }\DataTypeTok{vector}\NormalTok{ c, }\DataTypeTok{real}\NormalTok{ gamma) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c {-} gamma);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_lpmf(y | p);}
+\NormalTok{  \}}
+
+  \CommentTok{// Ordinal pseudo{-}random number generator assuming}
+  \CommentTok{// a latent standard logistic density function.}
+  \DataTypeTok{int}\NormalTok{ ordinal\_shifted\_logistic\_rng(}\DataTypeTok{vector}\NormalTok{ c, }\DataTypeTok{real}\NormalTok{ gamma) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c {-} gamma);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_rng(p);}
+\NormalTok{  \}}
+
+  \CommentTok{// Log probability density function over cut points}
   \CommentTok{// induced by a Dirichlet probability density function}
-  \CommentTok{// over baseline probabilities and latent logistic}
+  \CommentTok{// over baseline probabilities and a latent logistic}
   \CommentTok{// density function.}
   \DataTypeTok{real}\NormalTok{ induced\_dirichlet\_lpdf(}\DataTypeTok{vector}\NormalTok{ c, }\DataTypeTok{vector}\NormalTok{ alpha) \{}
     \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
     \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c);}
-    \DataTypeTok{vector}\NormalTok{[K] p;}
-    \DataTypeTok{real}\NormalTok{ logJ = }\DecValTok{0}\NormalTok{;}
-
-    \CommentTok{// Induced ordinal probabilities}
-\NormalTok{    p[}\DecValTok{1}\NormalTok{] = Pi[}\DecValTok{1}\NormalTok{];}
-    \ControlFlowTok{for}\NormalTok{ (k }\ControlFlowTok{in} \DecValTok{2}\NormalTok{:(K {-} }\DecValTok{1}\NormalTok{))}
-\NormalTok{      p[k] = Pi[k] {-} Pi[k {-} }\DecValTok{1}\NormalTok{];}
-\NormalTok{    p[K] = }\DecValTok{1}\NormalTok{ {-} Pi[K {-} }\DecValTok{1}\NormalTok{];}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
 
     \CommentTok{// Log Jacobian correction}
+    \DataTypeTok{real}\NormalTok{ logJ = }\DecValTok{0}\NormalTok{;}
     \ControlFlowTok{for}\NormalTok{ (k }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:(K {-} }\DecValTok{1}\NormalTok{)) \{}
       \ControlFlowTok{if}\NormalTok{ (c[k] \textgreater{}= }\DecValTok{0}\NormalTok{)}
 \NormalTok{        logJ += {-}c[k] {-} }\DecValTok{2}\NormalTok{ * log(}\DecValTok{1}\NormalTok{ + exp({-}c[k]));}
@@ -3231,9 +3398,9 @@ behaviors.
 \NormalTok{\}}
 
 \KeywordTok{data}\NormalTok{ \{}
-  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} I;                   }\CommentTok{// Number of items}
-  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} K;                   }\CommentTok{// Number of ordinal categories}
-  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} N;                   }\CommentTok{// Number of observations}
+  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} I; }\CommentTok{// Number of items}
+  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} K; }\CommentTok{// Number of ordinal categories}
+  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} N; }\CommentTok{// Number of observations}
 
   \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=I\textgreater{} item\_idx; }\CommentTok{// Observed items}
   \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=K\textgreater{} y;        }\CommentTok{// Observed categories}
@@ -3250,13 +3417,15 @@ behaviors.
 \NormalTok{  cut\_points \textasciitilde{} induced\_dirichlet(rep\_vector(}\DecValTok{1}\NormalTok{, K));}
 
   \CommentTok{// Observational model}
-\NormalTok{  y \textasciitilde{} ordered\_logistic(gamma[item\_idx], cut\_points);}
+  \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N)}
+\NormalTok{    y[n] \textasciitilde{} ordinal\_shifted\_logistic(cut\_points, gamma[item\_idx[n]]);}
 \NormalTok{\}}
 
 \KeywordTok{generated quantities}\NormalTok{ \{}
   \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=K\textgreater{} y\_pred;}
   \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N)}
-\NormalTok{    y\_pred[n] = ordered\_logistic\_rng(gamma[item\_idx[n]], cut\_points);}
+\NormalTok{    y\_pred[n] = ordinal\_shifted\_logistic\_rng(cut\_points,}
+\NormalTok{                                             gamma[item\_idx[n]]);}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
@@ -3265,14 +3434,14 @@ behaviors.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordered\_logistic\_comp\_induced.stan"}\NormalTok{,}
+\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordinal\_shifted\_logistic\_induced\_dirichlet.stan"}\NormalTok{,}
             \AttributeTok{data=}\NormalTok{data, }\AttributeTok{seed=}\DecValTok{8438338}\NormalTok{,}
             \AttributeTok{warmup=}\DecValTok{1000}\NormalTok{, }\AttributeTok{iter=}\DecValTok{2024}\NormalTok{, }\AttributeTok{refresh=}\DecValTok{0}\NormalTok{)}
 \end{Highlighting}
 \end{Shaded}
 
 If any degeneracies remain then they are not strong enough to cause any
-computational issues.
+serious computational issues.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -3298,8 +3467,42 @@ Markov chain Monte Carlo.
 \end{Shaded}
 
 \begin{verbatim}
-All expectands checked appear to be behaving well enough for reliable
-Markov chain Monte Carlo estimation.
+gamma[1]:
+  Chain 4: hat{ESS} (96.487) is smaller than desired (100).
+
+gamma[2]:
+  Chain 4: hat{ESS} (92.607) is smaller than desired (100).
+
+gamma[3]:
+  Chain 4: hat{ESS} (97.294) is smaller than desired (100).
+
+gamma[4]:
+  Chain 4: hat{ESS} (89.670) is smaller than desired (100).
+
+gamma[5]:
+  Chain 4: hat{ESS} (92.066) is smaller than desired (100).
+
+gamma[7]:
+  Chain 4: hat{ESS} (97.492) is smaller than desired (100).
+
+gamma[9]:
+  Chain 4: hat{ESS} (92.314) is smaller than desired (100).
+
+cut_points[1]:
+  Chain 4: hat{ESS} (90.759) is smaller than desired (100).
+
+cut_points[2]:
+  Chain 4: hat{ESS} (87.662) is smaller than desired (100).
+
+cut_points[3]:
+  Chain 4: hat{ESS} (84.884) is smaller than desired (100).
+
+cut_points[4]:
+  Chain 4: hat{ESS} (87.384) is smaller than desired (100).
+
+
+Small empirical effective sample sizes result in imprecise Markov chain
+Monte Carlo estimators.
 \end{verbatim}
 
 Retrodictive performance of both the aggregate and stratified histograms
@@ -3362,19 +3565,115 @@ interior cut points are all strongly informed.
 
 \includegraphics{ordinal_modeling_files/figure-pdf/unnamed-chunk-68-1.pdf}
 
-A mathematically equivalent implementation is to model the baseline
-ordinal probabilities and then derive the cut points assuming
-\(\gamma = 0\).
+Note that \texttt{Stan} provides its own implementation of a shifted
+logistic ordinal model under the name \texttt{ordered\_logistic}. The
+\texttt{Stan} implementation also swaps the cut point and shift
+arguments relative to the convention that I've used here.
+
+Because it is coded in \texttt{C++} the \texttt{Stan} implementation is
+a bit faster that what I have implemented here; it is also accepts
+vector arguments for the shifts so that the observational model can be
+defined without a loop.
 
 \begin{codelisting}
 
-\caption{\texttt{ordered\textbackslash\_logistic\textbackslash\_comp\textbackslash\_derived.stan}}
+\caption{\texttt{ordered\textbackslash\_logistic\textbackslash\_induced\textbackslash\_dirichlet.stan}}
 
 \begin{Shaded}
 \begin{Highlighting}[]
 \KeywordTok{functions}\NormalTok{ \{}
+  \CommentTok{// Log probability density function over cut point}
+  \CommentTok{// induced by a Dirichlet probability density function}
+  \CommentTok{// over baseline probabilities and latent logistic}
+  \CommentTok{// density function.}
+  \DataTypeTok{real}\NormalTok{ induced\_dirichlet\_lpdf(}\DataTypeTok{vector}\NormalTok{ c, }\DataTypeTok{vector}\NormalTok{ alpha) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+
+    \CommentTok{// Log Jacobian correction}
+    \DataTypeTok{real}\NormalTok{ logJ = }\DecValTok{0}\NormalTok{;}
+    \ControlFlowTok{for}\NormalTok{ (k }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:(K {-} }\DecValTok{1}\NormalTok{)) \{}
+      \ControlFlowTok{if}\NormalTok{ (c[k] \textgreater{}= }\DecValTok{0}\NormalTok{)}
+\NormalTok{        logJ += {-}c[k] {-} }\DecValTok{2}\NormalTok{ * log(}\DecValTok{1}\NormalTok{ + exp({-}c[k]));}
+      \ControlFlowTok{else}
+\NormalTok{        logJ += +c[k] {-} }\DecValTok{2}\NormalTok{ * log(}\DecValTok{1}\NormalTok{ + exp(+c[k]));}
+\NormalTok{    \}}
+
+    \ControlFlowTok{return}\NormalTok{ dirichlet\_lpdf(p | alpha) + logJ;}
+\NormalTok{  \}}
+\NormalTok{\}}
+
+\KeywordTok{data}\NormalTok{ \{}
+  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} I;                   }\CommentTok{// Number of items}
+  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} K;                   }\CommentTok{// Number of ordinal categories}
+  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} N;                   }\CommentTok{// Number of observations}
+
+  \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=I\textgreater{} item\_idx; }\CommentTok{// Observed items}
+  \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=K\textgreater{} y;        }\CommentTok{// Observed categories}
+\NormalTok{\}}
+
+\KeywordTok{parameters}\NormalTok{ \{}
+  \DataTypeTok{vector}\NormalTok{[I] gamma;           }\CommentTok{// Item qualities}
+  \DataTypeTok{ordered}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] cut\_points; }\CommentTok{// Interior cut points}
+\NormalTok{\}}
+
+\KeywordTok{model}\NormalTok{ \{}
+  \CommentTok{// Prior model}
+\NormalTok{  gamma \textasciitilde{} normal(}\DecValTok{0}\NormalTok{, }\DecValTok{5}\NormalTok{ / }\FloatTok{2.32}\NormalTok{);}
+\NormalTok{  cut\_points \textasciitilde{} induced\_dirichlet(rep\_vector(}\DecValTok{1}\NormalTok{, K));}
+
+  \CommentTok{// Observational model}
+\NormalTok{  y \textasciitilde{} ordered\_logistic(gamma[item\_idx], cut\_points);}
+\NormalTok{\}}
+
+\KeywordTok{generated quantities}\NormalTok{ \{}
+  \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=K\textgreater{} y\_pred;}
+  \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N)}
+\NormalTok{    y\_pred[n] = ordered\_logistic\_rng(gamma[item\_idx[n]], cut\_points);}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\end{codelisting}
+
+Finally another mathematically equivalent implementation is to model the
+baseline ordinal probabilities and then derive the interior cut points
+assuming \(\gamma = 0\). Once we've derived the cut points we can then
+shift the latent logistic density function to perturb the ordinal
+probabilities for each item.
+
+\begin{codelisting}
+
+\caption{\texttt{ordinal\textbackslash\_shifted\textbackslash\_logistic\textbackslash\_derived.stan}}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{functions}\NormalTok{ \{}
+  \CommentTok{// Ordinal probability mass function assuming a}
+  \CommentTok{// latent shifted logistic density function.}
+  \CommentTok{//}
+  \CommentTok{// Positive gamma shifts baseline ordinal}
+  \CommentTok{// probabilities towards larger values.}
+  \DataTypeTok{real}\NormalTok{ ordinal\_shifted\_logistic\_lpmf(}\DataTypeTok{int}\NormalTok{ y, }\DataTypeTok{vector}\NormalTok{ c, }\DataTypeTok{real}\NormalTok{ gamma) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c {-} gamma);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_lpmf(y | p);}
+\NormalTok{  \}}
+
+  \CommentTok{// Ordinal pseudo{-}random number generator assuming}
+  \CommentTok{// a latent standard logistic density function.}
+  \DataTypeTok{int}\NormalTok{ ordinal\_shifted\_logistic\_rng(}\DataTypeTok{vector}\NormalTok{ c, }\DataTypeTok{real}\NormalTok{ gamma) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c {-} gamma);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_rng(p);}
+\NormalTok{  \}}
+
   \CommentTok{// Derive cut points from baseline probabilities}
-  \CommentTok{// and latent logistic density function.}
+  \CommentTok{// and latent logistic density function centered}
+  \CommentTok{// at zero.}
   \DataTypeTok{vector}\NormalTok{ derived\_cut\_points(}\DataTypeTok{vector}\NormalTok{ p) \{}
     \DataTypeTok{int}\NormalTok{ K = num\_elements(p);}
     \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] c;}
@@ -3390,9 +3689,9 @@ ordinal probabilities and then derive the cut points assuming
 \NormalTok{\}}
 
 \KeywordTok{data}\NormalTok{ \{}
-  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} I;                   }\CommentTok{// Number of items}
-  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} K;                   }\CommentTok{// Number of ordinal categories}
-  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} N;                   }\CommentTok{// Number of observations}
+  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} I; }\CommentTok{// Number of items}
+  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} K; }\CommentTok{// Number of ordinal categories}
+  \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{\textgreater{} N; }\CommentTok{// Number of observations}
 
   \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=I\textgreater{} item\_idx; }\CommentTok{// Observed items}
   \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=K\textgreater{} y;        }\CommentTok{// Observed categories}
@@ -3414,13 +3713,15 @@ ordinal probabilities and then derive the cut points assuming
 \NormalTok{  p \textasciitilde{} dirichlet(rep\_vector(}\DecValTok{1}\NormalTok{, K));}
 
   \CommentTok{// Observational model}
-\NormalTok{  y \textasciitilde{} ordered\_logistic(gamma[item\_idx], cut\_points);}
+  \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N)}
+\NormalTok{    y[n] \textasciitilde{} ordinal\_shifted\_logistic(cut\_points, gamma[item\_idx[n]]);}
 \NormalTok{\}}
 
 \KeywordTok{generated quantities}\NormalTok{ \{}
   \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=K\textgreater{} y\_pred;}
   \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N)}
-\NormalTok{    y\_pred[n] = ordered\_logistic\_rng(gamma[item\_idx[n]], cut\_points);}
+\NormalTok{    y\_pred[n] = ordinal\_shifted\_logistic\_rng(cut\_points,}
+\NormalTok{                                             gamma[item\_idx[n]]);}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
@@ -3429,7 +3730,7 @@ ordinal probabilities and then derive the cut points assuming
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordered\_logistic\_comp\_derived.stan"}\NormalTok{,}
+\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordinal\_shifted\_logistic\_derived.stan"}\NormalTok{,}
             \AttributeTok{data=}\NormalTok{data, }\AttributeTok{seed=}\DecValTok{8438338}\NormalTok{,}
             \AttributeTok{warmup=}\DecValTok{1000}\NormalTok{, }\AttributeTok{iter=}\DecValTok{2024}\NormalTok{, }\AttributeTok{refresh=}\DecValTok{0}\NormalTok{)}
 \end{Highlighting}
@@ -3462,47 +3763,48 @@ Markov chain Monte Carlo.
 
 \begin{verbatim}
 gamma[1]:
-  Chain 4: hat{ESS} (97.755) is smaller than desired (100).
+  Chain 1: hat{ESS} (43.754) is smaller than desired (100).
 
 gamma[2]:
-  Chain 4: hat{ESS} (93.376) is smaller than desired (100).
+  Chain 1: hat{ESS} (39.831) is smaller than desired (100).
 
 gamma[3]:
-  Chain 4: hat{ESS} (86.845) is smaller than desired (100).
+  Chain 1: hat{ESS} (42.573) is smaller than desired (100).
 
 gamma[4]:
-  Chain 4: hat{ESS} (87.528) is smaller than desired (100).
+  Chain 1: hat{ESS} (36.565) is smaller than desired (100).
 
 gamma[5]:
-  Chain 4: hat{ESS} (91.126) is smaller than desired (100).
+  Chain 1: hat{ESS} (38.798) is smaller than desired (100).
 
 gamma[6]:
-  Chain 4: hat{ESS} (89.200) is smaller than desired (100).
+  Chain 1: hat{ESS} (40.949) is smaller than desired (100).
 
 gamma[7]:
-  Chain 4: hat{ESS} (96.254) is smaller than desired (100).
+  Chain 1: hat{ESS} (40.586) is smaller than desired (100).
 
 gamma[8]:
-  Chain 4: hat{ESS} (89.666) is smaller than desired (100).
+  Chain 1: hat{ESS} (41.810) is smaller than desired (100).
 
 gamma[9]:
-  Chain 4: hat{ESS} (90.257) is smaller than desired (100).
+  Chain 1: hat{ESS} (41.289) is smaller than desired (100).
 
 p[1]:
-  Chain 4: hat{ESS} (84.169) is smaller than desired (100).
+  Chain 1: hat{ESS} (30.114) is smaller than desired (100).
+  Chain 4: hat{ESS} (81.128) is smaller than desired (100).
 
 p[2]:
-  Chain 4: hat{ESS} (87.412) is smaller than desired (100).
+  Chain 1: hat{ESS} (39.982) is smaller than desired (100).
 
 p[3]:
-  Chain 4: hat{ESS} (97.796) is smaller than desired (100).
+  Chain 1: hat{ESS} (47.177) is smaller than desired (100).
+  Chain 4: hat{ESS} (87.203) is smaller than desired (100).
 
 p[4]:
-  Chain 4: hat{ESS} (90.148) is smaller than desired (100).
+  Chain 1: hat{ESS} (41.954) is smaller than desired (100).
 
 p[5]:
-  Chain 2: hat{ESS} (91.586) is smaller than desired (100).
-  Chain 4: hat{ESS} (80.009) is smaller than desired (100).
+  Chain 1: hat{ESS} (69.353) is smaller than desired (100).
 
 
 Small empirical effective sample sizes result in imprecise Markov chain
@@ -3593,12 +3895,12 @@ implementations doesn't show any appreciable difference.
 \end{Shaded}
 
 \begin{verbatim}
-Warning in util$plot_expectand_pushforward(samples3[[name]], 35, flim = c(-4, :
+Warning in util$plot_expectand_pushforward(samples4[[name]], 35, flim = c(-4, :
 2 values (0.0%) fell below the histogram binning.
 \end{verbatim}
 
 \begin{verbatim}
-Warning in util$plot_expectand_pushforward(samples3[[name]], 35, flim = c(-4, :
+Warning in util$plot_expectand_pushforward(samples4[[name]], 35, flim = c(-4, :
 0 values (0.0%) fell above the histogram binning.
 \end{verbatim}
 
@@ -3748,28 +4050,43 @@ population model}.
 
 \begin{codelisting}
 
-\caption{\texttt{ordered\textbackslash\_logistic\textbackslash\_comp\textbackslash\_induced\textbackslash\_hier.stan}}
+\caption{\texttt{ordinal\textbackslash\_shifted\textbackslash\_logistic\textbackslash\_induced\textbackslash\_dirichlet\textbackslash\_hier.stan}}
 
 \begin{Shaded}
 \begin{Highlighting}[]
 \KeywordTok{functions}\NormalTok{ \{}
-  \CommentTok{// Log probability density function over cut point}
+  \CommentTok{// Ordinal probability mass function assuming a}
+  \CommentTok{// latent shifted logistic density function.}
+  \CommentTok{//}
+  \CommentTok{// Positive gamma shifts baseline ordinal}
+  \CommentTok{// probabilities towards larger values.}
+  \DataTypeTok{real}\NormalTok{ ordinal\_shifted\_logistic\_lpmf(}\DataTypeTok{int}\NormalTok{ y, }\DataTypeTok{vector}\NormalTok{ c, }\DataTypeTok{real}\NormalTok{ gamma) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c {-} gamma);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_lpmf(y | p);}
+\NormalTok{  \}}
+
+  \CommentTok{// Ordinal pseudo{-}random number generator assuming}
+  \CommentTok{// a latent standard logistic density function.}
+  \DataTypeTok{int}\NormalTok{ ordinal\_shifted\_logistic\_rng(}\DataTypeTok{vector}\NormalTok{ c, }\DataTypeTok{real}\NormalTok{ gamma) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c {-} gamma);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_rng(p);}
+\NormalTok{  \}}
+
+  \CommentTok{// Log probability density function over cut points}
   \CommentTok{// induced by a Dirichlet probability density function}
-  \CommentTok{// over baseline probabilities and latent logistic}
+  \CommentTok{// over baseline probabilities and a latent logistic}
   \CommentTok{// density function.}
   \DataTypeTok{real}\NormalTok{ induced\_dirichlet\_lpdf(}\DataTypeTok{vector}\NormalTok{ c, }\DataTypeTok{vector}\NormalTok{ alpha) \{}
     \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
     \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c);}
-    \DataTypeTok{vector}\NormalTok{[K] p;}
-    \DataTypeTok{real}\NormalTok{ logJ = }\DecValTok{0}\NormalTok{;}
-
-    \CommentTok{// Induced ordinal probabilities}
-\NormalTok{    p[}\DecValTok{1}\NormalTok{] = Pi[}\DecValTok{1}\NormalTok{];}
-    \ControlFlowTok{for}\NormalTok{ (k }\ControlFlowTok{in} \DecValTok{2}\NormalTok{:(K {-} }\DecValTok{1}\NormalTok{))}
-\NormalTok{      p[k] = Pi[k] {-} Pi[k {-} }\DecValTok{1}\NormalTok{];}
-\NormalTok{    p[K] = }\DecValTok{1}\NormalTok{ {-} Pi[K {-} }\DecValTok{1}\NormalTok{];}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
 
     \CommentTok{// Log Jacobian correction}
+    \DataTypeTok{real}\NormalTok{ logJ = }\DecValTok{0}\NormalTok{;}
     \ControlFlowTok{for}\NormalTok{ (k }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:(K {-} }\DecValTok{1}\NormalTok{)) \{}
       \ControlFlowTok{if}\NormalTok{ (c[k] \textgreater{}= }\DecValTok{0}\NormalTok{)}
 \NormalTok{        logJ += {-}c[k] {-} }\DecValTok{2}\NormalTok{ * log(}\DecValTok{1}\NormalTok{ + exp({-}c[k]));}
@@ -3808,7 +4125,7 @@ population model}.
 \NormalTok{\}}
 
 \KeywordTok{parameters}\NormalTok{ \{}
-  \DataTypeTok{vector}\NormalTok{[I] gamma;                    }\CommentTok{// Item qualities}
+  \DataTypeTok{vector}\NormalTok{[I] gamma; }\CommentTok{// Item qualities}
 
   \DataTypeTok{simplex}\NormalTok{[K] mu\_p;                    }\CommentTok{// Population simplex baseline}
   \DataTypeTok{real}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{0}\NormalTok{\textgreater{} tau\_p;                }\CommentTok{// Population simplex scale}
@@ -3827,7 +4144,9 @@ population model}.
 \NormalTok{    cut\_points[j] \textasciitilde{} induced\_dirichlet(alpha);}
 
   \CommentTok{// Observational model}
-\NormalTok{  y \textasciitilde{} ordered\_logistic(gamma[item\_idx], cut\_points[context\_idx]);}
+  \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N)}
+\NormalTok{    y[n] \textasciitilde{} ordinal\_shifted\_logistic(cut\_points[context\_idx[n]],}
+\NormalTok{                                    gamma[item\_idx[n]]);}
 \NormalTok{\}}
 
 \KeywordTok{generated quantities}\NormalTok{ \{}
@@ -3835,8 +4154,8 @@ population model}.
 
   \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=K\textgreater{} y\_pred;}
   \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N)}
-\NormalTok{    y\_pred[n] = ordered\_logistic\_rng(gamma[item\_idx[n]],}
-\NormalTok{                                     cut\_points[context\_idx[n]]);}
+\NormalTok{    y\_pred[n] = ordinal\_shifted\_logistic\_rng(cut\_points[context\_idx[n]],}
+\NormalTok{                                             gamma[item\_idx[n]]);}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
@@ -3845,7 +4164,7 @@ population model}.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordered\_logistic\_comp\_induced\_hier.stan"}\NormalTok{,}
+\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordinal\_shifted\_logistic\_induced\_dirichlet\_hier.stan"}\NormalTok{,}
             \AttributeTok{data=}\NormalTok{data, }\AttributeTok{seed=}\DecValTok{8438338}\NormalTok{,}
             \AttributeTok{warmup=}\DecValTok{1000}\NormalTok{, }\AttributeTok{iter=}\DecValTok{2024}\NormalTok{, }\AttributeTok{refresh=}\DecValTok{0}\NormalTok{)}
 \end{Highlighting}
@@ -4007,11 +4326,32 @@ corresponding interior cut points.
 
 \begin{codelisting}
 
-\caption{\texttt{ordered\textbackslash\_logistic\textbackslash\_comp\textbackslash\_derived\textbackslash\_hier.stan}}
+\caption{\texttt{ordinal\textbackslash\_shifted\textbackslash\_logistic\textbackslash\_derived\textbackslash\_hier.stan}}
 
 \begin{Shaded}
 \begin{Highlighting}[]
 \KeywordTok{functions}\NormalTok{ \{}
+  \CommentTok{// Ordinal probability mass function assuming a}
+  \CommentTok{// latent shifted logistic density function.}
+  \CommentTok{//}
+  \CommentTok{// Positive gamma shifts baseline ordinal}
+  \CommentTok{// probabilities towards larger values.}
+  \DataTypeTok{real}\NormalTok{ ordinal\_shifted\_logistic\_lpmf(}\DataTypeTok{int}\NormalTok{ y, }\DataTypeTok{vector}\NormalTok{ c, }\DataTypeTok{real}\NormalTok{ gamma) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c {-} gamma);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_lpmf(y | p);}
+\NormalTok{  \}}
+
+  \CommentTok{// Ordinal pseudo{-}random number generator assuming}
+  \CommentTok{// a latent standard logistic density function.}
+  \DataTypeTok{int}\NormalTok{ ordinal\_shifted\_logistic\_rng(}\DataTypeTok{vector}\NormalTok{ c, }\DataTypeTok{real}\NormalTok{ gamma) \{}
+    \DataTypeTok{int}\NormalTok{ K = num\_elements(c) + }\DecValTok{1}\NormalTok{;}
+    \DataTypeTok{vector}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] Pi = inv\_logit(c {-} gamma);}
+    \DataTypeTok{vector}\NormalTok{[K] p = append\_row(Pi, [}\DecValTok{1}\NormalTok{]\textquotesingle{}) {-} append\_row([}\DecValTok{0}\NormalTok{]\textquotesingle{}, Pi);}
+    \ControlFlowTok{return}\NormalTok{ categorical\_rng(p);}
+\NormalTok{  \}}
+
   \CommentTok{// Derive cut points from baseline probabilities}
   \CommentTok{// and latent logistic density function.}
   \DataTypeTok{vector}\NormalTok{ derived\_cut\_points(}\DataTypeTok{vector}\NormalTok{ p) \{}
@@ -4048,6 +4388,7 @@ corresponding interior cut points.
 \NormalTok{\}}
 
 \KeywordTok{transformed parameters}\NormalTok{ \{}
+  \CommentTok{// Interior cut points}
   \DataTypeTok{array}\NormalTok{[J] }\DataTypeTok{ordered}\NormalTok{[K {-} }\DecValTok{1}\NormalTok{] cut\_points;}
   \ControlFlowTok{for}\NormalTok{ (j }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:J)}
 \NormalTok{    cut\_points[j] = derived\_cut\_points(p[j]);}
@@ -4065,7 +4406,9 @@ corresponding interior cut points.
 \NormalTok{    p[j] \textasciitilde{} dirichlet(alpha);}
 
   \CommentTok{// Observational model}
-\NormalTok{  y \textasciitilde{} ordered\_logistic(gamma[item\_idx], cut\_points[context\_idx]);}
+  \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N)}
+\NormalTok{    y[n] \textasciitilde{} ordinal\_shifted\_logistic(cut\_points[context\_idx[n]],}
+\NormalTok{                                    gamma[item\_idx[n]]);}
 \NormalTok{\}}
 
 \KeywordTok{generated quantities}\NormalTok{ \{}
@@ -4073,8 +4416,8 @@ corresponding interior cut points.
 
   \DataTypeTok{array}\NormalTok{[N] }\DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=K\textgreater{} y\_pred;}
   \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N)}
-\NormalTok{    y\_pred[n] = ordered\_logistic\_rng(gamma[item\_idx[n]],}
-\NormalTok{                                     cut\_points[context\_idx[n]]);}
+\NormalTok{    y\_pred[n] = ordinal\_shifted\_logistic\_rng(cut\_points[context\_idx[n]],}
+\NormalTok{                                             gamma[item\_idx[n]]);}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
@@ -4083,7 +4426,7 @@ corresponding interior cut points.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordered\_logistic\_comp\_derived\_hier.stan"}\NormalTok{,}
+\NormalTok{fit }\OtherTok{\textless{}{-}} \FunctionTok{stan}\NormalTok{(}\AttributeTok{file=}\StringTok{"stan\_programs/ordinal\_shifted\_logistic\_derived\_hier.stan"}\NormalTok{,}
             \AttributeTok{data=}\NormalTok{data, }\AttributeTok{seed=}\DecValTok{8438338}\NormalTok{,}
             \AttributeTok{warmup=}\DecValTok{1000}\NormalTok{, }\AttributeTok{iter=}\DecValTok{2024}\NormalTok{, }\AttributeTok{refresh=}\DecValTok{0}\NormalTok{)}
 \end{Highlighting}
@@ -4120,77 +4463,89 @@ Markov chain Monte Carlo.
 
 \begin{verbatim}
 gamma[1]:
-  Chain 4: hat{ESS} (82.522) is smaller than desired (100).
+  Chain 4: hat{ESS} (69.426) is smaller than desired (100).
 
 gamma[2]:
-  Chain 2: hat{ESS} (96.976) is smaller than desired (100).
-  Chain 4: hat{ESS} (75.157) is smaller than desired (100).
+  Chain 2: hat{ESS} (92.565) is smaller than desired (100).
+  Chain 4: hat{ESS} (62.679) is smaller than desired (100).
 
 gamma[3]:
-  Chain 4: hat{ESS} (86.602) is smaller than desired (100).
+  Chain 4: hat{ESS} (76.174) is smaller than desired (100).
 
 gamma[4]:
-  Chain 4: hat{ESS} (77.242) is smaller than desired (100).
+  Chain 4: hat{ESS} (65.889) is smaller than desired (100).
 
 gamma[5]:
-  Chain 4: hat{ESS} (87.479) is smaller than desired (100).
+  Chain 4: hat{ESS} (69.305) is smaller than desired (100).
 
 gamma[6]:
-  Chain 4: hat{ESS} (84.385) is smaller than desired (100).
+  Chain 4: hat{ESS} (69.709) is smaller than desired (100).
 
 gamma[7]:
-  Chain 4: hat{ESS} (93.870) is smaller than desired (100).
+  Chain 4: hat{ESS} (75.883) is smaller than desired (100).
 
 gamma[8]:
-  Chain 4: hat{ESS} (77.851) is smaller than desired (100).
+  Chain 4: hat{ESS} (67.523) is smaller than desired (100).
 
 gamma[9]:
-  Chain 4: hat{ESS} (84.061) is smaller than desired (100).
+  Chain 4: hat{ESS} (67.403) is smaller than desired (100).
 
 p[1,1]:
-  Chain 4: hat{ESS} (91.411) is smaller than desired (100).
+  Chain 4: hat{ESS} (74.821) is smaller than desired (100).
 
 p[2,1]:
-  Chain 4: hat{ESS} (89.002) is smaller than desired (100).
+  Chain 4: hat{ESS} (76.615) is smaller than desired (100).
 
 p[3,1]:
-  Chain 4: hat{ESS} (93.406) is smaller than desired (100).
+  Chain 4: hat{ESS} (72.310) is smaller than desired (100).
+
+p[4,1]:
+  Chain 4: hat{ESS} (87.472) is smaller than desired (100).
 
 p[5,1]:
-  Chain 4: hat{ESS} (97.664) is smaller than desired (100).
+  Chain 4: hat{ESS} (77.825) is smaller than desired (100).
 
 p[6,1]:
-  Chain 4: hat{ESS} (90.194) is smaller than desired (100).
+  Chain 4: hat{ESS} (75.315) is smaller than desired (100).
 
 p[7,1]:
-  Chain 4: hat{ESS} (94.705) is smaller than desired (100).
+  Chain 4: hat{ESS} (74.741) is smaller than desired (100).
+
+p[8,1]:
+  Chain 4: hat{ESS} (94.810) is smaller than desired (100).
 
 p[9,2]:
-  Chain 4: hat{ESS} (95.658) is smaller than desired (100).
+  Chain 4: hat{ESS} (82.693) is smaller than desired (100).
 
 p[1,4]:
-  Chain 4: hat{ESS} (93.915) is smaller than desired (100).
+  Chain 4: hat{ESS} (86.336) is smaller than desired (100).
+
+p[1,5]:
+  Chain 4: hat{ESS} (88.966) is smaller than desired (100).
 
 p[2,5]:
-  Chain 4: hat{ESS} (93.274) is smaller than desired (100).
+  Chain 4: hat{ESS} (73.600) is smaller than desired (100).
 
 p[3,5]:
-  Chain 4: hat{ESS} (98.033) is smaller than desired (100).
+  Chain 4: hat{ESS} (78.068) is smaller than desired (100).
 
 p[4,5]:
-  Chain 4: hat{ESS} (87.925) is smaller than desired (100).
+  Chain 4: hat{ESS} (82.506) is smaller than desired (100).
+
+p[5,5]:
+  Chain 4: hat{ESS} (82.858) is smaller than desired (100).
 
 p[6,5]:
-  Chain 4: hat{ESS} (93.714) is smaller than desired (100).
+  Chain 4: hat{ESS} (87.351) is smaller than desired (100).
 
 p[7,5]:
-  Chain 4: hat{ESS} (97.502) is smaller than desired (100).
+  Chain 4: hat{ESS} (83.040) is smaller than desired (100).
 
 p[8,5]:
-  Chain 4: hat{ESS} (85.770) is smaller than desired (100).
+  Chain 4: hat{ESS} (73.962) is smaller than desired (100).
 
 p[9,5]:
-  Chain 4: hat{ESS} (88.221) is smaller than desired (100).
+  Chain 4: hat{ESS} (72.169) is smaller than desired (100).
 
 
 Small empirical effective sample sizes result in imprecise Markov chain
@@ -4477,7 +4832,7 @@ LAPACK: /Library/Frameworks/R.framework/Versions/4.3-x86_64/Resources/lib/libRla
 locale:
 [1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
 
-time zone: America/New_York
+time zone: America/Edmonton
 tzcode source: internal
 
 attached base packages:
