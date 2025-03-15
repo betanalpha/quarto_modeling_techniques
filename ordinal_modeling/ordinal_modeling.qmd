@@ -1987,6 +1987,13 @@ shifts will generally vary across observations I have implemented the
 `ordinal_shifted_logistic` for one observation at a time, requiring a
 loop in the observational model.
 
+Note that the line `vector[K - 1] Pi = inv_logit(c - gamma);` can be
+equally-well interpreted as translating a standard logistic cumulative
+distribution function and then evaluating it at the interior cut points,
+evaluating a varying-location logistic cumulative distribution function
+at the interior cut points, or evaluating a standard logistic cumulative
+distribution function at translated interior cut points.
+
 Once again we'll start with an ill-defined uniform prior model, this
 time over both the interior cut points and the item qualities.
 
