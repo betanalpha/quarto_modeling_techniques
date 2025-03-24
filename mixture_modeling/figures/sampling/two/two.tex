@@ -55,13 +55,13 @@
     
     \node (D) at (0, 1.5 * \d) [unobsrec] { $\tilde{z}$ };
 
-    \node (E) at (0, 3 * \d) [unobscirc] { $y$ };
+    \node (E) at (0, 3 * \d) [unobscirc] { $x$ };
 
     \foreach \B/\E in {D/E} {
       \draw[->, >=stealth, color=mid, line width=1.5] (\B) -- (\E);
     }
     
-    \node at (0, -0.85 * \d) { $\tilde{y} \sim p(y \mid \tilde{z}) = p_{\tilde{z}}(y)$ };
+    \node at (0, -0.85 * \d) { $\tilde{x} \sim p(x \mid \tilde{z}) = p_{\tilde{z}}(x)$ };
 
   \end{scope}
 

@@ -192,123 +192,126 @@ Program}
 \setcounter{tocdepth}{3}
 \tableofcontents
 }
-Sometimes a single data generating process just isn't enough. When
-observations can arise from multiple data generating processes we need
-to model each of those data generating processes. If we don't know which
-of those possible data generating processes is responsible for a
-particular observation then we need to appeal to \emph{mixture
-modeling}.
+\newcommand{\lpdf}[1]{\log \circ \, #1 }
+
+Sometimes a single probabilistic model just isn't enough. When a
+behavior of interest might be consistent with multiple probabilistic
+models we need to incorporate each of those possibilities into the final
+model. If we don't know which of those possible probabilistic is
+responsible for a particular instance of that behavior then the only way
+to built a consistent joint model is with \emph{mixture modeling}.
 
 Mixture modeling allows us to, for example, account for undesired
-contamination, such as an irreducible background that overlaps with a
-desired signal. By mixing together probabilistic models for the signal
-and background events we can learn not only the behavior of each but
-also their relative prevalence in the observed data.
+contamination in observations, such as an irreducible background that
+overlaps with a desired signal. By mixing together probabilistic models
+for the signal and background events we can learn not only their
+individual behaviors but also their relative prevalence across the
+observed data.
 
 In this chapter we'll review the mathematical foundations and general
 implementation of mixture models, including the potential for
-frustrating inferential behaviors. Finally we'll illustrate these ideas
-with a series of demonstrative analyses.
+frustrating inferential behaviors. I will illustrate these concepts with
+a series of demonstrative analyses.
 
 \section{Implementing Mixture Models}\label{implementing-mixture-models}
 
-From a mathematical perspective mixing multiple data generating
-processes together is relatively straightforward. We have to do a bit of
-work, however, to derive an implementation that performs well in
-practice.
+From a mathematical perspective mixing multiple probabilistic models
+together is relatively straightforward. We have to do a bit of work,
+however, to derive an implementation that performs well in practice.
 
 \subsection{Categorical Implementations}\label{sec:cat_impl}
 
-Consider an observational space \(Y\) and a collection of \(K\)
-component probability distributions specified with the probability
-density functions, \(p_{k}(y)\), each modeling a distinct data
-generating process. To simplify the initial presentation we will assume
-that each component probability distribution is fixed so that there no
-model configuration variables to consider.
+Consider an mathematical space \(X\) and a collection of \(K\) component
+probability distributions specified with the probability density
+functions, \(p_{k}(x)\), each providing a different model for a behavior
+of interest. To simplify the initial presentation we will assume that
+each component probability distribution is fixed so that there no model
+configuration variables to consider.
 
-The most straightforward way to model an observation that can arise from
-any of these components is to introduce a categorical variable that
-labels the responsible data generating process, \[
+The most straightforward way to model a behavior that can arise from any
+of these component models is to introduce a categorical variable that
+labels the responsible component, \[
 z \in \{ 1, \ldots, k, \ldots, K \},
-\] and a corresponding probabilistic model \[
-p(z = k \mid \lambda_{1}, \ldots, \lambda_{K}) = \lambda_{k}
-\] where the \(\lambda_{k}\) from a simplex, \begin{align*}
+\] and a corresponding probabilistic model, \[
+p(z = k \mid \lambda_{1}, \ldots, \lambda_{K}) = \lambda_{k},
+\] where the categorical probabilities \(\lambda_{k}\) from a simplex
+configuration, \begin{align*}
 0 \le \lambda_{k} &\le 1
 \\
 \sum_{k = 1}^{K} \lambda_{k} &= 1.
 \end{align*}
 
-Each observation is then modeled with a value \(y \in Y\), an assignment
-\(z\), and the full Bayesian model \begin{align*}
-p(y, z \mid \lambda_{1}, \ldots, \lambda_{K})
+Each instance of this behavior is then modeled with a value \(x \in X\),
+an assignment \(z\), and the joint model \begin{align*}
+p(x, z \mid \lambda_{1}, \ldots, \lambda_{K})
 &=
-p(y \mid z) \, p(z \mid \lambda_{1}, \ldots, \lambda_{K})
+p(x \mid z) \, p(z \mid \lambda_{1}, \ldots, \lambda_{K})
 \\
 &=
-p_{z}(y) \, \lambda_{z}.
+p_{z}(x) \, \lambda_{z}.
 \end{align*}
 
-If we know the responsible data generating process then the component
-assignment variable \(z\) will be observed along with \(y\), but if we
-do not know \(z\) then all we can do is infer it from the observed value
-of \(y\). Assuming that the component probabilities and probability
-distributions are known the consistent component assignment are given by
-an application of Bayes' Theorem, \begin{align*}
-p(z \mid \tilde{y}, \lambda_{1}, \ldots, \lambda_{K})
+If we know the responsible component model then the component assignment
+variable \(z\) will be known. If we do not know \(z\), however, then all
+we can do is infer it from any particular value \(x\). Assuming that the
+component probabilities and component models are known the consistent
+component assignment are given by an application of Bayes' Theorem,
+\begin{align*}
+p(z \mid \tilde{x}, \lambda_{1}, \ldots, \lambda_{K})
 &=
 \frac{
-  p(\tilde{y}, z \mid \lambda_{1}, \ldots, \lambda_{K})
+  p(\tilde{x}, z \mid \lambda_{1}, \ldots, \lambda_{K})
 }{
-  \sum_{k = 1}^{K} p(\tilde{y}, k \mid \lambda_{1}, \ldots, \lambda_{K})
+  \sum_{k = 1}^{K} p(\tilde{x}, k \mid \lambda_{1}, \ldots, \lambda_{K})
 }
 \\
 &=
-\frac{ p_{z}(\tilde{y}) \, \lambda_{z}}
-{ \sum_{k = 1}^{K} p_{k}(\tilde{y}) \, \lambda_{k} }.
+\frac{ p_{z}(\tilde{x}) \, \lambda_{z}}
+{ \sum_{k = 1}^{K} p_{k}(\tilde{x}) \, \lambda_{k} }.
 \end{align*}
 
-When modeling multiple, independent observations from overlapping data
-generating processes we have to consider the heterogeneity of the
-categorical variables. In particular if all of the categorical variables
-are modeled with the same component probabilities then the joint full
-Bayesian model becomes \begin{align*}
-p(y_{1}, z_{1}, \ldots, y_{N}, z_{N} \mid
+When modeling multiple, independent instances of a behavior we have to
+consider possible heterogeneity in the categorical variables.
+
+If all of the categorical variables are modeled with the same component
+probabilities then the joint model becomes \begin{align*}
+p(x_{1}, z_{1}, \ldots, x_{N}, z_{N} \mid
   \lambda_{1}, \ldots, \lambda_{K})
 &=
 \prod_{n = 1}^{N}
-p(y_{n} \mid z_{n}) \, p(z_{n} \mid \lambda_{1}, \ldots, \lambda_{K})
+p(x_{n} \mid z_{n}) \, p(z_{n} \mid \lambda_{1}, \ldots, \lambda_{K})
 \\
 &=
 \prod_{n = 1}^{N}
-p_{z_{n}}(y_{n}) \, \lambda_{z_{n}}.
+p_{z_{n}}(x_{n}) \, \lambda_{z_{n}}.
 \end{align*} On the other hand if the component probabilities can vary
-across observations then we need a separate simplex for each
-observation, \[
+across observations then we need a separate simplex configuration for
+each observation, \[
 \boldsymbol{\lambda}_{n} = ( \lambda_{n, 1}, \ldots, \lambda_{n, K}),
-\] and the joint full Bayesian model becomes \begin{align*}
-p(y_{1}, z_{1}, \ldots, y_{N}, z_{N} \mid
+\] and the joint model becomes \begin{align*}
+p(x_{1}, z_{1}, \ldots, x_{N}, z_{N} \mid
   \boldsymbol{\lambda}_{1}, \ldots, \boldsymbol{\lambda}_{N})
 &=
 \prod_{n = 1}^{N}
-p(y_{n} \mid z_{n}) \, p(z_{n} \mid \boldsymbol{\lambda}_{n})
+p(x_{n} \mid z_{n}) \, p(z_{n} \mid \boldsymbol{\lambda}_{n})
 \\
 &=
 \prod_{n = 1}^{N}
-p_{z_{n}}(y_{n}) \, \lambda_{n, z_{n}}.
+p_{z_{n}}(x_{n}) \, \lambda_{n, z_{n}}.
 \end{align*}
 
 In either case inferences of the individual \(z_{n}\) depend on only the
-observed \(y_{n}\), \[
-p(z_{n} \mid \tilde{y}_{n}, \lambda_{1}, \ldots, \lambda_{K})
+value of the corresponding \(x_{n}\), \[
+p(z_{n} \mid \tilde{x}_{n}, \lambda_{1}, \ldots, \lambda_{K})
 =
-\frac{ p_{z_{n}}(\tilde{y}_{n}) \, \lambda_{z_{n}}}
-{ \sum_{k = 1}^{K} p_{k}(\tilde{y}_{n}) \, \lambda_{k} }
+\frac{ p_{z_{n}}(\tilde{x}_{n}) \, \lambda_{z_{n}}}
+{ \sum_{k = 1}^{K} p_{k}(\tilde{x}_{n}) \, \lambda_{k} }
 \] or \[
-p(z_{n} \mid \tilde{y}_{n}, \lambda_{n, 1}, \ldots, \lambda_{n, K})
+p(z_{n} \mid \tilde{x}_{n}, \lambda_{n, 1}, \ldots, \lambda_{n, K})
 =
-\frac{ p_{z_{n}}(\tilde{y}_{n}) \, \lambda_{n, z_{n}}}
-{ \sum_{k = 1}^{K} p_{k}(\tilde{y}_{n}) \, \lambda_{n, k} },
-\] again conditioned on fixed component probabilities and component
+\frac{ p_{z_{n}}(\tilde{x}_{n}) \, \lambda_{n, z_{n}}}
+{ \sum_{k = 1}^{K} p_{k}(\tilde{x}_{n}) \, \lambda_{n, k} },
+\] again assuming fixed component probabilities and component
 probability distributions.
 
 \subsection{Marginal Implementations}\label{marginal-implementations}
@@ -319,43 +322,51 @@ observation but also those variables are discrete which limits the
 available computational tools. Specifically we cannot use gradient-based
 methods like Hamiltonian Monte Carlo to explore posterior distributions
 over the component assignments and component probabilities, let alone
-the configuration of the component probability distributions.
+any configuration parameters for the component models, at the same time.
 
 Fortunately marginalizing unknown categorical assignments out of the
-full Bayesian model is straightforward.
+joint model is straightforward.
 
 \subsubsection{Single Observation}\label{single-observation}
 
-For a single observation marginalizing an unknown component assignment
+For a single instance marginalizing an unknown component assignment
 requires summing over the \(K\) possible values, \begin{align*}
-p(y \mid \lambda_{1}, \ldots, \lambda_{K})
+p(x \mid \lambda_{1}, \ldots, \lambda_{K})
 &=
 \sum_{k = 1}^{K}
-p(y, z = k \mid \lambda_{1}, \ldots, \lambda_{K})
+p(x, z = k \mid \lambda_{1}, \ldots, \lambda_{K})
 \\
 &=
 \sum_{k = 1}^{K}
-p(y \mid z = k) \, p(z = k \mid \lambda_{1}, \ldots, \lambda_{K})
+p(x \mid z = k) \, p(z = k \mid \lambda_{1}, \ldots, \lambda_{K})
 \\
 &=
 \sum_{k = 1}^{K}
-p_{k}(y) \, \lambda_{k}.
-\end{align*} In other words all we have to do eliminate an categorical
-variable is add together all of the the component probability density
-functions weighted by the component probabilities.
+p_{k}(x) \, \lambda_{k},
+\end{align*} which is often written as \begin{equation*}
+p(x \mid \lambda_{1}, \ldots, \lambda_{K})
+=
+\sum_{k = 1}^{K}
+\lambda_{k} \, p_{k}(x).
+\end{equation*} In other words all we have to do to eliminate a
+categorical variable is add together all of the the component
+probability density functions weighted by the component probabilities.
 
 \subsubsection{Multiple Homogeneous
 Observations}\label{multiple-homogeneous-observations}
 
-Given multiple, independent observations modeled by the same component
+Given multiple, independent instances with the same component
 probabilities we can marginalize each component individually,
 \begin{align*}
-p(y_{1}, \ldots, y_{N} \mid \lambda_{1}, \ldots, \lambda_{K})
+p(x_{1}, \ldots, x_{N} \mid \lambda_{1}, \ldots, \lambda_{K})
 &=
-\prod_{n = 1}^{N} p(y_{n} \mid \lambda_{1}, \ldots, \lambda_{K})
+\prod_{n = 1}^{N} p(x_{n} \mid \lambda_{1}, \ldots, \lambda_{K})
 \\
 &=
-\prod_{n = 1}^{N} \sum_{k = 1}^{K} p_{k}(y_{n}) \, \lambda_{k}.
+\prod_{n = 1}^{N} \sum_{k = 1}^{K} p_{k}(x_{n}) \, \lambda_{k}
+\\
+&=
+\prod_{n = 1}^{N} \sum_{k = 1}^{K} \lambda_{k} \, p_{k}(x_{n}).
 \end{align*}
 
 \subsubsection{Multiple Heterogeneous
@@ -363,27 +374,27 @@ Observations}\label{multiple-heterogeneous-observations}
 
 Accounting for heterogeneity in the component probabilities is a bit
 more cumbersome, \begin{align*}
-p(y_{1}, \ldots, y_{N} \mid
+p(x_{1}, \ldots, x_{N} \mid
   \boldsymbol{\lambda}_{1}, \ldots, \boldsymbol{\lambda}_{N})
 &=
-\prod_{n = 1}^{N} p(y_{n} \mid \boldsymbol{\lambda}_{n})
+\prod_{n = 1}^{N} p(x_{n} \mid \boldsymbol{\lambda}_{n})
 \\
 &=
-\prod_{n = 1}^{N} \sum_{k = 1}^{K} p_{k}(y_{n}) \, \lambda_{n, k}.
+\prod_{n = 1}^{N} \sum_{k = 1}^{K} p_{k}(x_{n}) \, \lambda_{n, k}.
 \end{align*}
 
-Interesting we can sometimes simplify the heterogeneous model even
+Interestingly we can sometimes simplify the heterogeneous model even
 further by marginalizing out not only the individual categorical
-variables but also the individual simplices! Specifically we need the
-individual simplices to be independent and identically distributed so
-that any consistent probabilistic model is of the form \[
+variables but also the individual categorical probabilities!
+
+Specifically if the individual categorical probabilities are independent
+and identically distributed then any consistent probabilistic model for
+their behavior will be of the form \[
 p(\boldsymbol{\lambda}_{n}, \ldots, \boldsymbol{\lambda}_{n})
 =
 \prod_{n = 1}^{N} p(\boldsymbol{\lambda}_{n}).
-\]
-
-In this case the expectation value of any component probability is the
-same for all observations, \begin{align*}
+\] In this case the expectation value of any component probability is
+the same for all observations, \begin{align*}
 \int \mathrm{d} \boldsymbol{\lambda}_{1} \cdots
      \mathrm{d} \boldsymbol{\lambda}_{N}
 p(\boldsymbol{\lambda}_{1}, \ldots, \boldsymbol{\lambda}_{N}) \,
@@ -415,8 +426,8 @@ p(\boldsymbol{\lambda}_{n}) \, \lambda_{n, k}
 \omega_{k}.
 \end{align*}
 
-Moreover these individual expectation values form their own simplex: the
-boundedness of each \(\lambda_{n, k}\) implies that \[
+Moreover these individual expectation values form their own simplex
+configuration: the bounds on each \(\lambda_{n, k}\) imply that \[
 0 \le \omega_{k} \le 1
 \] while \begin{align*}
 \sum_{k = 1}^{K} \omega_{k}
@@ -439,18 +450,18 @@ p(\boldsymbol{\lambda}_{n}) \, 1
 
 Under these assumptions the marginal mixture model is given by
 \begin{align*}
-p(y_{1}, \ldots, y_{N})
+p(x_{1}, \ldots, x_{N})
 &=
 \int \mathrm{d} \boldsymbol{\lambda}_{1} \cdots
      \mathrm{d} \boldsymbol{\lambda}_{N}
-p(y_{1}, \ldots, y_{N},
+p(x_{1}, \ldots, x_{N},
   \boldsymbol{\lambda}_{1}, \ldots, \boldsymbol{\lambda}_{N})
 \\
 &=
 \int \mathrm{d} \boldsymbol{\lambda}_{1} \cdots
      \mathrm{d} \boldsymbol{\lambda}_{N}
 \bigg[
-\prod_{n = 1}^{N} \sum_{k = 1}^{K} p_{k}(y_{n}) \, \lambda_{n, k}
+\prod_{n = 1}^{N} \sum_{k = 1}^{K} p_{k}(x_{n}) \, \lambda_{n, k}
 \bigg]
 \prod_{n = 1}^{N} p(\boldsymbol{\lambda}_{n})
 \\
@@ -458,122 +469,122 @@ p(y_{1}, \ldots, y_{N},
 \prod_{n = 1}^{N}
 \int \mathrm{d} \boldsymbol{\lambda}_{n}
 \bigg[
-\sum_{k = 1}^{K} p_{k}(y_{n}) \, \lambda_{n, k}
+\sum_{k = 1}^{K} p_{k}(x_{n}) \, \lambda_{n, k}
 \bigg]
 p(\boldsymbol{\lambda}_{n})
 \\
 &=
 \prod_{n = 1}^{N}
-\sum_{k = 1}^{K} \bigg[ p_{k}(y_{n})
+\sum_{k = 1}^{K} \bigg[ p_{k}(x_{n})
 \int \mathrm{d} \boldsymbol{\lambda}_{n} \,
 p(\boldsymbol{\lambda}_{n}) \, \lambda_{n, k} \bigg]
 \\
 &=
 \prod_{n = 1}^{N}
-\sum_{k = 1}^{K} \bigg[ p_{k}(y_{n}) \, \omega_{k} \bigg].
+\sum_{k = 1}^{K} \bigg[ p_{k}(x_{n}) \, \omega_{k} \bigg].
 \end{align*}
 
 In other words the heterogeneous model reduces to the same form as the
-homogeneous mixture model only with a new simplex \[
+homogeneous mixture model, only with the categorical probabilities \[
 \boldsymbol{\omega} = (\omega_{1}, \ldots, \omega_{K})!
-\] The new simplex components \(\omega_{k}\) can no longer be
-interpreted as the probability of any \emph{individual} observation
-arising from a particular component data generating process. Instead
-they capture the \emph{proportion} of the ensemble of observations that
-arises from each component data generating process.
+\] Critically the new categorical probabilities \(\omega_{k}\) can no
+longer be interpreted as the probability of any \emph{individual}
+instance of the target behavior arising from a particular component
+model. Instead they capture the \emph{proportion} of the ensemble of
+instances that arises from each component model.
 
 \subsection{Numerically Stable Marginal
 Implementations}\label{sec:stable_impl}
 
 Most probabilistic programming languages, for example the Stan modeling
-language, work not with probability density functions \(p(y)\) but
-rather log probability density functions \(\log \circ \, p(y)\).
+language, work not with probability density functions \(p(x)\) but
+rather log probability density functions \(\log \circ \, p (x)\).
 Consequently in order to implement a mixture model in these languages we
 need to evaluate \begin{align*}
-\log \circ \, p(y_{1}, \ldots, y_{N} \mid \lambda_{1}, \ldots, \lambda_{K})
+\log \circ \, p  (x_{1}, \ldots, x_{N} \mid \lambda_{1}, \ldots, \lambda_{K})
 &=
 \log \bigg(
-\prod_{n = 1}^{N} \sum_{k = 1}^{K} \lambda_{k} p_{k}(y_{n})
+\prod_{n = 1}^{N} \sum_{k = 1}^{K} \lambda_{k} \, p_{k}(x_{n})
 \bigg)
 \\
 &=
 \sum_{n = 1}^{N}
-\log \bigg( \sum_{k = 1}^{K} \lambda_{k} p_{k}(y_{n}) \bigg)
+\log \bigg( \sum_{k = 1}^{K} \lambda_{k} \, p_{k}(x_{n}) \bigg)
 \\
 &=
 \sum_{n = 1}^{N}
 \log \bigg(
-\sum_{k = 1}^{K} \lambda_{k} \exp( \log \circ \, p_{k}(y_{n}) )
+\sum_{k = 1}^{K} \lambda_{k} \, \exp( \log \circ \, p_{k} (x_{n}) )
 \bigg)
 \\
 &=
 \sum_{n = 1}^{N}
 \log \bigg(
-\sum_{k = 1}^{K} \exp( \log(\lambda_{k}) + \log \circ \, p_{k}(y_{n}) ).
+\sum_{k = 1}^{K} \exp( \log(\lambda_{k}) + \log \circ \, p_{k} (y_{n}) ).
 \bigg)
 \end{align*} In other words for each observation we need to exponentiate
 a term for each component, evaluate the sum of the exponentials, and
-then apply the natural logarithm function again.
+then apply the natural logarithm function.
 
 This composite operation is often referred to as the ``log sum exp''
 function, \[
-\text{log-sum-exp}(x_{1}, \ldots, x_{K})
+\text{log-sum-exp}(v_{1}, \ldots, v_{K})
 =
-\log \bigg( \sum_{k = 1}^{K} \exp (x_{k}) \bigg).
+\log \bigg( \sum_{k = 1}^{K} \exp (v_{k}) \bigg).
 \] Implementing this operation on computers is complicated by the
 limitations of floating point arithmetic. In particular the intermediate
-terms \(\exp(x_{k})\) are prone to overflowing to floating point
+terms \(\exp(v_{k})\) are prone to overflowing to floating point
 infinity and corrupting the calculation before the final logarithm can
 calm things down.
 
-That said the properties of logarithms and exponentials allow us to
+Fortunately the properties of logarithms and exponentials allow us to
 implement the log sum exp operation in a variety of ways. Specifically
 we can always factor out any one component without affecting the final
 value, \begin{align*}
-\text{log-sum-exp}(x_{1}, \ldots, x_{K})
+\text{log-sum-exp}(v_{1}, \ldots, v_{K})
 &=
-\log \bigg( \sum_{k = 1}^{K} \exp (x_{k}) \bigg)
+\log \bigg( \sum_{k = 1}^{K} \exp (v_{k}) \bigg)
 \\
 &=
-\log \bigg( \exp (x_{k'}) + \sum_{k \ne k'} \exp (x_{k}) \bigg)
+\log \bigg( \exp (v_{k'}) + \sum_{k \ne k'} \exp (v_{k}) \bigg)
 \\
 &=
-\log \bigg( \exp (x_{k'}) \bigg)
-\bigg(1 + \sum_{k \ne k'} \frac{ \exp (x_{k}) }{ \exp (x_{k'}) } \bigg)
+\log \bigg( \exp (v_{k'}) \bigg)
+\bigg(1 + \sum_{k \ne k'} \frac{ \exp (v_{k}) }{ \exp (v_{k'}) } \bigg)
 \\
 &=
-\log \bigg( \exp (x_{k'}) \bigg)
-\bigg(1 + \sum_{k \ne k'} \exp (x_{k} - x_{k'}) \bigg)
+\log \bigg( \exp (v_{k'}) \bigg)
+\bigg(1 + \sum_{k \ne k'} \exp (v_{k} - v_{k'}) \bigg)
 \\
 &=
-\log \exp (x_{k'})
-+ \log \bigg(1 + \sum_{k \ne k'} \exp (x_{k} - x_{k'}) \bigg)
+\log \exp (v_{k'})
++ \log \bigg(1 + \sum_{k \ne k'} \exp (v_{k} - v_{k'}) \bigg)
 \\
 &=
-x_{k'} + \log \bigg(1 + \sum_{k \ne k'} \exp (x_{k} - x_{k'}) \bigg).
+v_{k'} + \log \bigg(1 + \sum_{k \ne k'} \exp (v_{k} - v_{k'}) \bigg).
 \end{align*}
 
 If we factor out the largest component value then \[
-x_{k'} \ge x_{k \ne k'}
-\] and the input to each exponential will always be less than or equal
-to one and the calculation will never encounter floating point overflow.
+v_{k'} \ge v_{k \ne k'},
+\] the input to each exponential will always be less than or equal to
+one, and the calculation will never encounter floating point overflow.
 Conveniently most computational libraries provide log sum exp function
 implementations that automatically factor out the largest value and
-ensure stable numerical computation. Consequently we need to worry about
-numerical stability only when implementing operations like these
+ensure stable numerical computation. Because of this we need to worry
+about numerical stability only when implementing operations like these
 ourselves.
 
-For example in Stan we can avoid any issues by using the built-in
-\texttt{log\_sum\_exp} function.
+For example in Stan we can avoid any numerical issues by using the
+built-in \texttt{log\_sum\_exp} function.
 
 \begin{Shaded}
 \begin{Highlighting}[]
 \CommentTok{// Loop over observations}
 \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N) \{}
-  \KeywordTok{target +=}\NormalTok{ log\_sum\_exp(log(lambda[}\DecValTok{1}\NormalTok{]) + foo1\_lpdf(y[n]),}
-\NormalTok{                        log(lambda[}\DecValTok{2}\NormalTok{]) + foo2\_lpdf(y[n]),}
-\NormalTok{                        log(lambda[}\DecValTok{3}\NormalTok{]) + foo3\_lpdf(y[n]),}
-\NormalTok{                        log(lambda[}\DecValTok{4}\NormalTok{]) + foo4\_lpdf(y[n]));}
+  \KeywordTok{target +=}\NormalTok{ log\_sum\_exp(log(lambda[}\DecValTok{1}\NormalTok{]) + foo1\_lpdf(x[n]),}
+\NormalTok{                        log(lambda[}\DecValTok{2}\NormalTok{]) + foo2\_lpdf(x[n]),}
+\NormalTok{                        log(lambda[}\DecValTok{3}\NormalTok{]) + foo3\_lpdf(x[n]),}
+\NormalTok{                        log(lambda[}\DecValTok{4}\NormalTok{]) + foo4\_lpdf(x[n]));}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
@@ -585,22 +596,22 @@ single vector argument.
 \begin{Highlighting}[]
 \CommentTok{// Loop over observations}
 \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N) \{}
-  \DataTypeTok{vector}\NormalTok{[}\DecValTok{4}\NormalTok{] lpds = [ foo1\_lpdf(y[n]), foo2\_lpdf(y[n]),}
-\NormalTok{                     foo3\_lpdf(y[n]), foo4\_lpdf(y[n]) ]\textquotesingle{};}
+  \DataTypeTok{vector}\NormalTok{[}\DecValTok{4}\NormalTok{] lpds = [ foo1\_lpdf(x[n]), foo2\_lpdf(x[n]),}
+\NormalTok{                     foo3\_lpdf(x[n]), foo4\_lpdf(x[n]) ]\textquotesingle{};}
   \KeywordTok{target +=}\NormalTok{ log\_sum\_exp(log(lambda) + lpds);}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
 
 When working with only two components there is also a \texttt{log\_mix}
-function that incorporates the mixture probabilities directly.
+function that incorporates the mixture probability directly.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{log\_mix(theta, foo1\_lpdf(y[n]), foo2\_lpdf(y[n]))}
+\NormalTok{log\_mix(theta, foo1\_lpdf(x[n]), foo2\_lpdf(x[n]))}
 \NormalTok{=}
-\NormalTok{log\_sum\_exp(log(theta)     + foo1\_lpdf(y[n]),}
-\NormalTok{            log(}\DecValTok{1}\NormalTok{ {-} theta) + foo2\_lpdf(y[n]))}
+\NormalTok{log\_sum\_exp(log(theta)     + foo1\_lpdf(x[n]),}
+\NormalTok{            log(}\DecValTok{1}\NormalTok{ {-} theta) + foo2\_lpdf(x[n]))}
 \end{Highlighting}
 \end{Shaded}
 
@@ -610,20 +621,23 @@ vanishes, \[
 \lambda_{k} = 0,
 \] then the input to the log sum exp function will overflow to negative
 infinity, \begin{align*}
-x_{k'}
+v_{k'}
 &=
-\log(\lambda_{k'}) + \log \circ \, p_{k'}(y)
+\log(\lambda_{k'}) + \log \circ \, p_{k'} (x)
 \\
 &=
--\infty + \log \circ \, p_{k'}(y)
+\log(0) + \log \circ \, p_{k'} (x)
+\\
+&=
+-\infty + \log \circ \, p_{k'} (x)
 \\
 &=
 -\infty.
 \end{align*} At the same time negative infinities also arise if any of
 the component probability density functions vanish, \begin{align*}
-x_{k'}
+v_{k'}
 &=
-\log(\lambda_{k'}) + \log \circ \, p_{k'}(y)
+\log(\lambda_{k'}) + \log \circ \, p_{k'} (x)
 \\
 &=
 \log(\lambda_{k'}) + \log(0)
@@ -637,44 +651,44 @@ x_{k'}
 
 Formally any negative infinite input results in a vanishing exponential
 output \[
-\exp(x_{k}) = \exp(-\infty) = 0
+\exp(v_{k}) = \exp(-\infty) = 0
 \] and no contribution to the intermediate sum. \[
-\sum_{k = 1}^{K} \exp(x_{k}) = \sum_{k \ne k'} \exp (x_{k}),
+\sum_{k = 1}^{K} \exp(v_{k}) = \sum_{k \ne k'} \exp (v_{k}),
 \] Consequently we have, at least in theory, the identity \begin{align*}
-\text{log-sum-exp}&(x_{1}, \ldots, x_{k - 1}, x_{k} = -\infty,
-                     x_{k + 1}, \ldots, x_{K})
+\text{log-sum-exp}&(v_{1}, \ldots, v_{k - 1}, v_{k} = -\infty,
+                    v_{k + 1}, \ldots, v_{K})
 \\
 &=
-\text{log-sum-exp}(x_{1}, \ldots, x_{k - 1},
-                     x_{k + 1}, \ldots, x_{K}).
+\text{log-sum-exp}(v_{1}, \ldots, v_{k - 1},
+                   v_{k + 1}, \ldots, v_{K}).
 \end{align*} In practice, however, the negative infinity can wreak havoc
 on the floating point calculations.
 
 To avoid potential numerical complications entirely we need to drop the
 offending component \emph{before} trying to evaluate the inputs to the
 log sum exp function. Specifically we compute \[
-x_{k} = \log(\lambda_{k}) + \log \circ p_{k}(y)
+v_{k} = \log(\lambda_{k}) + \log \circ \, p_{k} (x)
 \] for only the components with \(\lambda_{k} > 0\) and
-\(p_{k}(y) > 0\), and then evaluate the log sum exp function on only
+\(p_{k}(x) > 0\), and then evaluate the log sum exp function on only
 these well-behaved inputs.
 
 \subsection{Sampling From Mixture Models}\label{sec:sampling}
 
-Although we've done a good bit of work to remove the component
-assignments from mixture models they are not without their uses. Indeed
-they make sampling from a mixture model particularly straightforward.
+We've done a good bit of work to remove the component assignments from
+mixture models, but they are not without their uses. Indeed they make
+sampling from a mixture model particularly straightforward.
 
-The unmarginalized full Bayesian model \[
-p(y, z \mid \lambda_{1}, \ldots, \lambda_{K})
+In particular the unmarginalized joint model \[
+p(x, z \mid \lambda_{1}, \ldots, \lambda_{K})
 =
-p(y \mid z) \, p(z \mid \lambda_{1}, \ldots, \lambda_{K})
-\] immediately motivates an ancestral sampling strategy. We first select
-a component by sampling a categorical variable
-(Figure~\ref{fig-sampling-one}) \[
+p(x \mid z) \, p(z \mid \lambda_{1}, \ldots, \lambda_{K})
+\] immediately motivates an ancestral sampling strategy for generating
+samples of \(x\) and \(z\). We first select a component by sampling a
+categorical variable (Figure~\ref{fig-sampling-one}) \[
 \tilde{z} \sim p(z \mid \lambda_{1}, \ldots, \lambda_{K})
-\] and then sample from the corresponding component probability
+\] and then we sample from the corresponding component probability
 distribution (Figure~\ref{fig-sampling-two}) \[
-\tilde{y} \sim p(y \mid \tilde{z}) = p_{\tilde{z}}(y).
+\tilde{x} \sim p(x \mid \tilde{z}) = p_{\tilde{z}}(y).
 \]
 
 \begin{figure}
@@ -709,20 +723,20 @@ distribution (Figure~\ref{fig-sampling-two}) \[
 \caption{\label{fig-sampling}Sampling from a mixture model is a
 straightforward, two-step process. (a) We first sample a component
 \(\tilde{z}\) given the component probabilities
-\(p(z = k) = \lambda_{k}\) and then (b) sample an observation
-\(\tilde{y}\) from the corresponding component probability distribution
-\(p_{\tilde{z}}(y)\).}
+\(p(z = k) = \lambda_{k}\) and then (b) sample a value \(\tilde{x}\)
+from the corresponding component probability distribution
+\(p_{\tilde{z}}(x)\).}
 
 \end{figure}%
 
-Together the pair \(\{ \tilde{y}, \tilde{z} \}\) defines a sample from
+Together the pair \(\{ \tilde{x}, \tilde{z} \}\) defines a sample from
 the unmarginalized model, \[
-\{ \tilde{y}, \tilde{z} \}
+\{ \tilde{x}, \tilde{z} \}
 \sim
-p(y, z \mid \lambda_{1}, \ldots, \lambda_{K}),
-\] while the single value \(\tilde{y}\) defines a sample from the
+p(x, z \mid \lambda_{1}, \ldots, \lambda_{K}),
+\] while the single value \(\tilde{x}\) defines a sample from the
 marginalized model, \[
-\tilde{y} \sim p(y \mid \lambda_{1}, \ldots, \lambda_{K}).
+\tilde{x} \sim p(y \mid \lambda_{1}, \ldots, \lambda_{K}).
 \]
 
 Implementing this two-step sampling procedure in the Stan Modeling
@@ -736,11 +750,11 @@ Language is straightforward.
   \DataTypeTok{int}\NormalTok{\textless{}}\KeywordTok{lower}\NormalTok{=}\DecValTok{1}\NormalTok{, }\KeywordTok{upper}\NormalTok{=K\textgreater{} z = categorical\_rng(lambda);}
   \CommentTok{// Sample an observation}
   \ControlFlowTok{if}\NormalTok{ (z == }\DecValTok{1}\NormalTok{) \{}
-\NormalTok{    y[n] = foo1\_rng();}
+\NormalTok{    x[n] = foo1\_rng();}
 \NormalTok{  \} }\ControlFlowTok{else} \ControlFlowTok{if}\NormalTok{ (z == }\DecValTok{2}\NormalTok{) \{}
-\NormalTok{    y[n] = foo2\_rng();}
+\NormalTok{    x[n] = foo2\_rng();}
 \NormalTok{  \} }\ControlFlowTok{else} \ControlFlowTok{if}\NormalTok{ (z == }\DecValTok{3}\NormalTok{) \{}
-\NormalTok{    y[n] = foo3\_rng();}
+\NormalTok{    x[n] = foo3\_rng();}
 \NormalTok{  \} ...}
 \NormalTok{\}}
 \end{Highlighting}
@@ -748,12 +762,12 @@ Language is straightforward.
 
 Given values for the component probabilities and component probability
 distributions we can also conditionally sample component assignments for
-any observation using the posterior distribution that we derived in
+any value using the posterior distribution that we derived in
 \hyperref[sec:cat_impl]{Section 1.1}, \[
 \tilde{z}
 \sim
-\frac{ p_{z}(\tilde{y}) \, \lambda_{z} }
-{ \sum_{k = 1}^{K} p_{k}(\tilde{y}) \, \lambda_{k} }.
+\frac{ p_{z}(\tilde{x}) \, \lambda_{z} }
+{ \sum_{k = 1}^{K} p_{k}(\tilde{x}) \, \lambda_{k} }.
 \]
 
 For example we could sample marginal posterior assignments using the
@@ -763,10 +777,10 @@ For example we could sample marginal posterior assignments using the
 \begin{Highlighting}[]
 \CommentTok{// Loop over observations}
 \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N) \{}
-  \DataTypeTok{vector}\NormalTok{[}\DecValTok{4}\NormalTok{] log\_ps =   log(lambda[}\DecValTok{1}\NormalTok{]) + foo1\_lpdf(y[n])}
-\NormalTok{                     + log(lambda[}\DecValTok{2}\NormalTok{]) + foo2\_lpdf(y[n])}
-\NormalTok{                     + log(lambda[}\DecValTok{3}\NormalTok{]) + foo3\_lpdf(y[n])}
-\NormalTok{                     + log(lambda[}\DecValTok{4}\NormalTok{]) + foo4\_lpdf(y[n]);}
+  \DataTypeTok{vector}\NormalTok{[}\DecValTok{4}\NormalTok{] log\_ps =   log(lambda[}\DecValTok{1}\NormalTok{]) + foo1\_lpdf(x[n])}
+\NormalTok{                     + log(lambda[}\DecValTok{2}\NormalTok{]) + foo2\_lpdf(x[n])}
+\NormalTok{                     + log(lambda[}\DecValTok{3}\NormalTok{]) + foo3\_lpdf(x[n])}
+\NormalTok{                     + log(lambda[}\DecValTok{4}\NormalTok{]) + foo4\_lpdf(x[n]);}
   \DataTypeTok{simplex}\NormalTok{[}\DecValTok{4}\NormalTok{] ps = softmax(log\_ps);}
 \NormalTok{  z[n] = categorical\_rng(ps);}
 \NormalTok{\}}
@@ -781,90 +795,109 @@ the input arguments.
 \begin{Highlighting}[]
 \CommentTok{// Loop over observations}
 \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N) \{}
-  \DataTypeTok{vector}\NormalTok{[}\DecValTok{4}\NormalTok{] log\_ps =   log(lambda[}\DecValTok{1}\NormalTok{]) + foo1\_lpdf(y[n])}
-\NormalTok{                     + log(lambda[}\DecValTok{2}\NormalTok{]) + foo2\_lpdf(y[n])}
-\NormalTok{                     + log(lambda[}\DecValTok{3}\NormalTok{]) + foo3\_lpdf(y[n])}
-\NormalTok{                     + log(lambda[}\DecValTok{4}\NormalTok{]) + foo4\_lpdf(y[n]);}
+  \DataTypeTok{vector}\NormalTok{[}\DecValTok{4}\NormalTok{] log\_ps =   log(lambda[}\DecValTok{1}\NormalTok{]) + foo1\_lpdf(x[n])}
+\NormalTok{                     + log(lambda[}\DecValTok{2}\NormalTok{]) + foo2\_lpdf(x[n])}
+\NormalTok{                     + log(lambda[}\DecValTok{3}\NormalTok{]) + foo3\_lpdf(x[n])}
+\NormalTok{                     + log(lambda[}\DecValTok{4}\NormalTok{]) + foo4\_lpdf(x[n]);}
 \NormalTok{  z[n] = categorical\_log\_rng(log\_ps);}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
 
-\section{Inflation Models}\label{sec:inflation}
+\section{Notable Mixture Models}\label{notable-mixture-models}
+
+Mixture modeling is a very general modeling technique but there are a
+few special cases worth particular discussion.
+
+\subsection{Inflation Models}\label{sec:inflation}
 
 \textbf{Inflation models} are a special case of mixture modeling where
 one or more of the component probability distributions concentrate on
-single values in the observation space. These singular probability
-distributions are defined by the allocations \[
-\delta_{y_{\mathrm{inf}}}( \mathsf{y} )
+single values. These singular probability distributions are defined by
+the allocations \[
+\delta_{x_{\mathrm{inf}}}( \mathsf{x} )
 =
 \left\{
 \begin{array}{rl}
-1, & y_{\mathrm{inf}} \in    \mathsf{y}, \\
-0, & y_{\mathrm{inf}} \notin \mathsf{y}
+1, & x_{\mathrm{inf}} \in    \mathsf{x}, \\
+0, & x_{\mathrm{inf}} \notin \mathsf{x}
 \end{array}
 \right. .
-\] They are are also known as \textbf{Dirac probability distributions},
-or simply Dirac distributions for short.
+\] They are also known as \textbf{Dirac probability distributions}, or
+simply Dirac distributions for short.
 
-The implementation of inflation models, however, requires some care,
-especially when the Dirac probability distribution is not compatible
-with the natural reference measure on a space and we cannot construct
-well-defined probability density functions.
+While this definition is straightforward, the implementation of
+inflation models requires some care, especially when the Dirac
+probability distribution is not compatible with the natural reference
+measure on the ambient space and we cannot construct well-defined
+probability density functions.
 
-Note that, while inflation models can in theory contain any number of
-component probability distributions, in this section I will consider
-only two, one baseline component and one inflated component, to simplify
-the presentation.
+In theory inflation models can contain any number of component
+probability distributions but in this section I will consider only two,
+one baseline component and one inflated component, to simplify the
+presentation.
 
-\subsection{Discrete Inflation Models}\label{discrete-inflation-models}
+\subsubsection{Discrete Inflation
+Models}\label{discrete-inflation-models}
 
-On discrete spaces \(Y\) any Dirac probability distribution can be
-specified with a probability density function relative to the counting
-measure, in other words a probability mass function, \[
-\delta_{y_{\mathrm{inf}}}(y)
+On discrete spaces any Dirac probability distribution can be specified
+with a probability density function relative to the counting measure, in
+other words a probability mass function, \[
+\delta_{x_{\mathrm{inf}}}(x)
 =
 \left\{
 \begin{array}{rl}
-1, & y =   y_{\mathrm{inf}}, \\
-0, & y \ne y_{\mathrm{inf}}
+1, & x =   x_{\mathrm{inf}}, \\
+0, & x \ne x_{\mathrm{inf}}
 \end{array}
 \right. .
-\] Consequently we can immediately implement a corresponding inflation
-model using probability mass functions.
+\] To allows us to implement a corresponding inflation model using
+probability mass functions.
 
 For example we can take a baseline probability distribution specified by
-the probability mass function \(p_{\mathrm{baseline}}(y)\) and inflate
-the value \(y = y_{\mathrm{inf}}\) by mixing it with a Dirac probability
+the probability mass function \(p_{\mathrm{baseline}}(x)\) and inflate
+the value \(x = x_{\mathrm{inf}}\) by mixing it with a Dirac probability
 mass function, \[
-p(y) =
-  \lambda \, p_{\mathrm{baseline}}(y)
-+ (1 - \lambda) \, \delta_{y_{\mathrm{inf}}}(y).
-\]
-
-That said because the Dirac component allocates zero probability to so
-many elements we have to take care when evaluating the logarithm of this
-mixed probability mass function. If \(y = y_{\mathrm{inf}}\) then \[
-\delta_{y_{\mathrm{inf}}}(y = y_{\mathrm{inf}}) = 1
-\] and \[
-\log \circ \, \delta_{y_{\mathrm{inf}}}(y = y_{\mathrm{inf}}) = 0.
-\] At this point evaluating the log probability mass function is
-straightforward, \begin{align*}
-\log \circ \, p(y_{\mathrm{inf}})
+p(x) =
+  \lambda \, p_{\mathrm{baseline}}(x)
++ (1 - \lambda) \, \delta_{x_{\mathrm{inf}}}(x),
+\] or equivalently \begin{align*}
+\log \circ \, p (x_{\mathrm{inf}})
 &=
 \text{log-sum-exp}\big(
   \log(\lambda)
-+ \log \circ \, p_{\mathrm{baseline}}(y_{\mathrm{inf}}),
++ \log \circ \, p_{\mathrm{baseline}} (x_{\mathrm{inf}}),
 \\
 &
 \hphantom{=\text{log-sum-exp}\big(\;}
   \log(1 - \lambda)
-+ \log \circ \, \delta_{y_{\mathrm{inf}}}(y_{\mathrm{inf}}) \; \big)
++ \log \circ \, \delta_{x_{\mathrm{inf}}} (x_{\mathrm{inf}}) \; \big).
+\end{align*}
+
+Because the Dirac component allocates zero probability to so many
+elements, however, we have to take care when evaluating the logarithm of
+this mixed probability mass function. If \(x = x_{\mathrm{inf}}\) then
+\[
+\delta_{x_{\mathrm{inf}}}(x = x_{\mathrm{inf}}) = 1
+\] and \[
+\log \circ \, \delta_{x_{\mathrm{inf}}} (x = x_{\mathrm{inf}}) = 0.
+\] At this point evaluating the log probability mass function is
+straightforward, \begin{align*}
+\log \circ \, p (x_{\mathrm{inf}})
+&=
+\text{log-sum-exp}\big(
+  \log(\lambda)
++ \log \circ \, p_{\mathrm{baseline}} (x_{\mathrm{inf}}),
+\\
+&
+\hphantom{=\text{log-sum-exp}\big(\;}
+  \log(1 - \lambda)
++ \log \circ \, \delta_{x_{\mathrm{inf}}} (x_{\mathrm{inf}}) \; \big)
 \\
 &=
 \text{log-sum-exp}\big(
   \log(\lambda)
-+ \log \circ \, p_{\mathrm{baseline}}(y_{\mathrm{inf}}) ),
++ \log \circ \, p_{\mathrm{baseline}} (x_{\mathrm{inf}}) ),
 \\
 &
 \hphantom{=\text{log-sum-exp}\big(\;}
@@ -873,37 +906,37 @@ straightforward, \begin{align*}
 &=
 \text{log-sum-exp}\big(
   \log(\lambda)
-+ \log \circ \, p_{\mathrm{baseline}}(y_{\mathrm{inf}}) ),
++ \log \circ \, p_{\mathrm{baseline}} (x_{\mathrm{inf}}) ),
 \\
 &
 \hphantom{=\text{log-sum-exp}\big(\;}
 \log(1 - \lambda) \; \big).
 \end{align*}
 
-On the other hand if \(y \ne y_{\mathrm{inf}}\) then \[
-\delta_{y_{\mathrm{inf}}}(y \ne y_{\mathrm{inf}}) = 0
+On the other hand if \(x \ne x_{\mathrm{inf}}\) then \[
+\delta_{x_{\mathrm{inf}}}(x \ne x_{\mathrm{inf}}) = 0
 \] and \[
-\log \circ \, \delta_{y_{\mathrm{inf}}}(y \ne y_{\mathrm{inf}}) = -\infty.
+\log \circ \, \delta_{x_{\mathrm{inf}}} (x \ne x_{\mathrm{inf}}) = -\infty.
 \] To avoid numerical issues arising from the negative infinity we need
 to follow the procedure introduced in \hyperref[sec:stable_impl]{Section
-1.3}, first accounting for the zero, \begin{align*}
-p(y)
+1.3}, first analytically accounting for the zero, \begin{align*}
+p(x)
 &=
-  \lambda \, p_{\mathrm{baseline}}(y)
-+ (1 - \lambda) \, \delta_{y_{\mathrm{inf}}}(y)
+  \lambda \, p_{\mathrm{baseline}}(x)
++ (1 - \lambda) \, \delta_{x_{\mathrm{inf}}}(x)
 \\
 &=
-\lambda \, p_{\mathrm{baseline}}(y) + (1 - \lambda) \, 0
+\lambda \, p_{\mathrm{baseline}}(x) + (1 - \lambda) \, 0
 \\
 &=
-\lambda \, p_{\mathrm{baseline}}(y),
+\lambda \, p_{\mathrm{baseline}}(x),
 \end{align*} and only then taking the natural logarithm, \begin{align*}
-\log \circ \, p(y)
+\log \circ \, p (y)
 &=
-\log \big( \lambda \, p_{\mathrm{baseline}}(y) \big)
+\log \big( \lambda \, p_{\mathrm{baseline}}(x) \big)
 \\
 &=
-\log (\lambda) + \log \circ \, p_{\mathrm{baseline}}(y).
+\log (\lambda) + \log \circ \, p_{\mathrm{baseline}} (x).
 \end{align*}
 
 In other words to ensure stable numerical calculations in practice we
@@ -915,17 +948,17 @@ inflation model. For example in Stan we might write
 \CommentTok{// Loop over observations}
 \ControlFlowTok{for}\NormalTok{ (n }\ControlFlowTok{in} \DecValTok{1}\NormalTok{:N) \{}
   \CommentTok{// Check equality with inflated value}
-  \ControlFlowTok{if}\NormalTok{ (y[n] == y\_inf) \{}
-    \KeywordTok{target +=}\NormalTok{ log\_sum\_exp(log(lambda) + log\_p\_baseline(y[n]),}
+  \ControlFlowTok{if}\NormalTok{ (x[n] == x\_inf) \{}
+    \KeywordTok{target +=}\NormalTok{ log\_sum\_exp(log(lambda) + log\_p\_baseline(x[n]),}
 \NormalTok{                          log(}\DecValTok{1}\NormalTok{ {-} lambda));}
 \NormalTok{  \} }\ControlFlowTok{else}\NormalTok{ \{}
-    \KeywordTok{target +=}\NormalTok{ log(lambda) + log\_p\_baseline(y[n]);}
+    \KeywordTok{target +=}\NormalTok{ log(lambda) + log\_p\_baseline(x[n]);}
 \NormalTok{  \}}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
 
-\subsection{Continuous Inflation Models}\label{sec:cont_infl}
+\subsubsection{Continuous Inflation Models}\label{sec:cont_infl}
 
 Unfortunately Dirac probability distributions are less well-behaved on
 continuous spaces. The problem is that Dirac probability distributions
@@ -935,81 +968,84 @@ Consequently we cannot define an appropriate probability density
 function.
 
 A common heuristic for denoting a continuous inflation model uses the
-Dirac delta function \(\delta(y)\). The Dirac delta function is defined
-by the integral action \[
-\int \mathrm{d} y \, \delta(y) f(y) = f(0)
-\] but doesn't actually have a well-defined point-wise output. We can
-then denote a continuous inflation model with a single inflated value
-\(y_{\mathrm{inf}}\) as \[
-p(y)
+Dirac delta function \(\delta(x)\). Recall that the Dirac delta function
+is defined by the integral action \[
+\int \mathrm{d} x \, \delta(x) f(x) = f(0)
+\] and doesn't actually have a well-defined point-wise output.
+
+Using a Dirac delta function we can heuristically write a continuous
+inflation model with a single inflated value \(x_{\mathrm{inf}}\) as \[
+p(x)
 =
-  \lambda       \, p_{\mathrm{baseline}}(y)
-+ (1 - \lambda) \, \delta(y - y_{\mathrm{inf}})
-\] but, because we cannot evaluate \(\delta(y - y_{\mathrm{inf}})\), we
-actually cannot evaluate \(p(y)\).
+  \lambda       \, p_{\mathrm{baseline}}(x)
++ (1 - \lambda) \, \delta(x - x_{\mathrm{inf}})
+\] but, because we cannot evaluate \(\delta(x - x_{\mathrm{inf}})\), we
+actually cannot evaluate \(p(x)\).
 
 In order to formally implement a continuous inflation model we need to
-break the observational space \(Y\) into two pieces, once containing the
-inflated value \(y_{\mathrm{inf}}\) and one containing everything else
-\(Y \setminus y_{\mathrm{inf}}\). We can then treat
-\(\{ y_{\mathrm{inf}}\}\) as a discrete space equipped with a counting
-reference measure and and \(Y \setminus y_{\mathrm{inf}}\) as a
+break the ambient space \(X\) into two pieces, once containing the
+inflated value \(x_{\mathrm{inf}}\) and one containing everything else
+\(X \setminus x_{\mathrm{inf}}\). We can then treat
+\(\{ x_{\mathrm{inf}}\}\) as a discrete space equipped with a counting
+reference measure and and \(X \setminus x_{\mathrm{inf}}\) as a
 continuous space equipped with, for example, a Lebesgue reference
 measure.
 
 If \(\pi_{\mathrm{baseline}}\) is absolutely continuous with respect to
-a Lebesgue reference measure on \(Y\) then the probability allocated to
-the inflated value will be zero \[
-\pi_{\mathrm{baseline}}( \{ y_{\mathrm{inf}} \} ) = 0.
+a Lebesgue reference measure on \(X\) then the probability allocated to
+any singular inflated value will be zero \[
+\pi_{\mathrm{baseline}}( \{ x_{\mathrm{inf}} \} ) = 0.
 \] Consequently the baseline component will effectively define the same
-probability distribution on \(Y\) and \(Y \setminus y_{\mathrm{inf}}\),
+probability distribution on \(X\) and \(X \setminus x_{\mathrm{inf}}\),
 and we can represent both with the same probability density function. In
-other words for \(y \ne y_{\mathrm{inf}}\) the inflation model can be
+other words for \(x \ne x_{\mathrm{inf}}\) the inflation model can be
 specified by the probability density function \[
-p(y)
+p(x)
 =
-\lambda \, p_{\mathrm{baseline}}(y)
+\lambda \, p_{\mathrm{baseline}}(x).
 \]
 
-On the other hand for \(y = y_{\mathrm{inf}}\) we have to treat the
+On the other hand for \(x = x_{\mathrm{inf}}\) we have to treat the
 mixture probability density function as a probability mass function,
 \begin{align*}
-p( y_{\mathrm{inf}} )
+p( x_{\mathrm{inf}} )
 &=
-\pi( \{ y_{\mathrm{inf}} \} )
+\pi( \{ x_{\mathrm{inf}} \} )
 \\
 &=
-+ \lambda \, \pi_{\mathrm{baseline}}( \{ y_{\mathrm{inf}} \} )
-+ (1 - \lambda) \, \delta( \{ y_{\mathrm{inf}} \} )
+  \lambda \, \pi_{\mathrm{baseline}}( \{ x_{\mathrm{inf}} \} )
++ (1 - \lambda) \, \delta_{x_{\mathrm{inf}}}( \{ x_{\mathrm{inf}} \} )
 \\
 &=
-+ \lambda \, 0
+  \lambda \, 0
 + (1 - \lambda) \, 1
 \\
 &=
 (1 - \lambda).
 \end{align*}
 
-When working with \(N\) independent observations it's convenient to
-first separate the observations into the \(N_{\mathrm{inf}}\)
-observations that exactly equal the inflated value, \[
+When working with \(N\) independent instances it's convenient to first
+separate the values into the \(N_{\mathrm{inf}}\) instances that exactly
+equal the inflated value, \[
 v_{1}, \ldots, v_{N_{\mathrm{inf}}},
 \] and the remaining \(N - N_{\mathrm{inf}}\) observations that don't,
 \[
 w_{1}, \ldots, w_{N - N_{\mathrm{inf}}}.
 \] This allows us to simplify the joint probability density function
 into the form \begin{align*}
-p(y_{1}, \ldots, y_{N})
+p(x_{1}, \ldots, x_{N})
 &=
-\prod_{n = 1}^{N} p(y_{n})
+\prod_{n = 1}^{N} p(x_{n})
 \\
 &=
 \prod_{n = 1}^{N_{\mathrm{inf}}} p(v_{n}) \,
 \prod_{n = 1}^{N - N_{\mathrm{inf}}} p(w_{n})
 \\
 &=
-\prod_{n = 1}^{N_{\mathrm{inf}}} (1 - \lambda) \,
-\prod_{n = 1}^{N - N_{\mathrm{inf}}} \lambda \, p_{\mathrm{baseline}}(w_{n})
+\prod_{n = 1}^{N_{\mathrm{inf}}}
+  (1 - \lambda) \,
+\prod_{n = 1}^{N - N_{\mathrm{inf}}}
+  \lambda \, p_{\mathrm{baseline}}(w_{n})
 \\
 &=
 (1 - \lambda)^{N_{\mathrm{inf}}} \,
@@ -1022,27 +1058,27 @@ p(y_{1}, \ldots, y_{N})
 \end{align*}
 
 In other words the continuous inflation model completely decouples into
-a Binomial model for the number of inflated observations and a baseline
-model for the non-inflated observations! Moreover because these models
-are independent of each other they can be implemented together or
-separately \emph{without impacting any of our inferences}.
+a Binomial model for the number of inflated values and a baseline model
+for the non-inflated values! Moreover, because these models are
+independent of each other they can be implemented together or separately
+\emph{without impacting any inferences}.
 
 The intuition here is that when evaluating the mixture model on the
 inflated value the contribution of the inflating component is always
 infinitely larger than the contribution from any other components. If we
-observe \(y_{\mathrm{inf}}\) then we know that it \emph{had} to have
-been generated by the inflating component, and if we observe any other
-value then we know that it \emph{had} to have been generated by another
+encounter \(x_{\mathrm{inf}}\) then we know that it \emph{has} to be
+associated with the inflated component, and if we observe any other
+value then we know that it \emph{has} to be associated with another
 component. Because of this lack of ambiguity we can always separate the
 inflated and non-inflated values and model them separately without
 compromising the consistency of our inferences.
 
-\section{Categorical and Multinomial Mixture
+\subsection{Categorical and Multinomial Mixture
 Models}\label{categorical-and-multinomial-mixture-models}
 
 Categorical probability distributions are relatively simple objects, but
 mixtures of categorical probability distributions exhibit a unique
-property.
+property that can be of use in some circumstances.
 
 Recall that every categorical probability distribution over a set of
 \(K\) unstructured elements is defined by \(K\) atomic probabilities \[
@@ -1059,7 +1095,7 @@ component probability distribution is a Dirac probability distribution,
 =
 \sum_{k = 1}^{K} q_{k} \, \delta_{ k }( z ),
 \] where the Dirac probability distribution and probability mass
-function behave as in \hyperref[sec:inflation]{Section 2}.
+function behave as in \hyperref[sec:inflation]{Section 2.1.1}.
 
 Interestingly the mixture of two different categorical probability
 distributions is always another categorical probability distribution,
@@ -1099,19 +1135,20 @@ distributions defines another categorical probability distribution,
 \mathrm{categorical}( z \mid
 \textstyle \sum_{j = 1}^{J} \lambda_{j} \, \mathbf{q}_{j} ).
 \end{align*} In other words mixing categorical probability distributions
-is equivalent to mixing the corresponding simplex parameters together.
+is equivalent to mixing the corresponding simplex configurations
+together.
 
-The closure of categorical probability distributions under mixtures, and
-the corresponding duality between probability distribution mixtures and
-simplex parameter mixtures, is quite exceptional. Consider, for example,
-the multinomial probability distribution over element counts induced by
-the identical and independent product of an initial categorical
-probability distribution, \[
+That said the closure of categorical probability distributions under
+mixtures, and the corresponding duality between probability distribution
+mixtures and simplex configuration mixtures, is exceptional. Consider,
+for example, the multinomial probability distribution over the total
+counts over an ensemble of identical and independent categorical
+instances, \[
 \mathrm{multinomial}( n_{1}, \ldots, n_{K} \mid \mathbf{q})
 =
 N! \prod_{k = 1}^{K} \frac{ q_{k}^{n_{k}} }{ n_{k}! }.
-\] While mixing simplices together is equivalent to mixing the
-corresponding categorical probability distributions together,
+\] While mixing simplex configurations together is equivalent to mixing
+the corresponding categorical probability distributions together,
 \begin{align*}
 \mathrm{categorical} & ( z \mid
 \textstyle \sum_{j = 1}^{J} \lambda_{j} \, \mathbf{q}_{j} )
@@ -1139,11 +1176,12 @@ multinomial probability distributions together
 }
 
 \caption{\label{fig-binomial}Mixing categorical probability
-distributions is equivalent to mixing the defining simplex parameters,
-but this property does generalize to other probability distributions
-derived from categorical probability distributions, such as the
-multinomial distribution. For example a mixture of the two binomial
-probability distributions \(\mathrm{binominal}(n \mid N, p_{1})\) and
+distributions is equivalent to mixing the defining simplex
+configurations, but this property does not generalize to other
+probability distributions derived from categorical probability
+distributions, such as the multinomial distribution. For example a
+mixture of the two binomial probability distributions
+\(\mathrm{binominal}(n \mid N, p_{1})\) and
 \(\mathrm{binominal}(n \mid N, p_{2})\) is not the same as the binomial
 distribution defined by the mixture of \(p_{1}\) and \(p_{2}\) even
 though
@@ -1159,32 +1197,330 @@ The left-hand side \[
 \] corresponds to \emph{heterogeneous} component categorical probability
 distributions. Specifically it implies that a proportion \(\lambda_{j}\)
 of the \(N\) component categorical probability distributions are
-configured by the simplex \(\mathbf{q}_{j}\). These heterogeneous
-contributions to the counts wash out the detail of each simplex, always
-resulting in a uni-modal probability distribution.
+configured by \(\mathbf{q}_{j}\). These heterogeneous contributions to
+the counts wash out the detail of each component model, always resulting
+in a uni-modal probability distribution.
 
 On the other side \[
 \sum_{j = 1}^{J} \lambda_{j}
 \mathrm{multinomial}( n_{1}, \ldots, n_{K} \mid \mathbf{q}_{j})
 \] corresponds to \emph{homogeneous} component categorical probability
-distributions. For each simplex \(\mathbf{q}_{j}\) the corresponding
-multinomial distribution concentrates around the count values
-\(q_{jk} \, N\). The mixture model overlays these distinct peaks on top
-of each other, resulting in a multi-modal probability distribution.
+distributions. For each simplex configuration \(\mathbf{q}_{j}\) the
+corresponding multinomial distribution concentrates around the count
+values \(q_{jk} \, N\). The mixture model overlays these distinct peaks
+on top of each other, resulting in a multi-modal probability
+distribution.
 
 In general we have to take care to avoid misinterpreting models defined
-by mixtures of parameters as proper mixture models.
+by mixtures of parameters as probabilistic mixture models.
 
-\section{Mixture Model Inferences}\label{mixture-model-inferences}
+\subsection{Continuous Mixture Models}\label{continuous-mixture-models}
 
-In practice mixture models are typically used in applications where the
-neither the component probabilities nor the configuration of the
-component probability distributions is known precisely. Consequently the
-main inferential challenge is to infer all of these behaviors from the
-observed data at the same time.
+So far we have considered mixture models with only a finite number of
+components. These models are defined by the joint probability density
+function \[
+p(x, z) = p(x \mid z) \, p(z)
+\] with \[
+z \in Z = \{ 1, \ldots, k, \ldots, K \},
+\] or equivalently the marginal probability density function
+\begin{align*}
+p(x)
+&=
+\sum_{k = 1}^{K} p(x \mid k) \, p(k)
+\\
+&=
+\sum_{k = 1}^{K} p_{k}(x) \, \lambda_{k}
+\\
+&=
+\sum_{k = 1}^{K} \lambda_{k} \, p_{k}(x).
+\end{align*}
 
-Theoretically we can infer these behaviors jointly with the unknown
-component assignments, \begin{align*}
+We can immediately extend this construction to mixture models with a
+countably infinite number of components, \[
+p(x, z) = p(x \mid z) \, p(z)
+\] with \[
+z \in Z = \{ 1, \ldots, k, \ldots, \},
+\] or equivalently \begin{align*}
+p(x)
+&=
+\sum_{k = 1}^{\infty} p(x \mid k) \, p(k)
+\\
+&=
+\sum_{k = 1}^{\infty} p_{k}(x) \, \lambda_{k}
+\\
+&=
+\sum_{k = 1}^{\infty} \lambda_{k} \, p_{k}(x).
+\end{align*}
+
+These models are referred to as \textbf{discrete mixture models} because
+the categorical assignment variables take values in discrete spaces. To
+be more precise they can also be referred to as finite discrete mixture
+models and infinite discrete mixture models, respectively.
+
+Mathematics, however, allows us to take this construction even further:
+by allowing the assignment variable to take values in an arbitrary space
+we can build mixture models from an arbitrary number of components. For
+example if \(Z = \mathbb{R}\) then the joint model \[
+p(x, z) = p(x \mid z) \, p(z).
+\] can be interpreted as a mixture model with an uncountably infinite
+number of component models, each of which is specified by the
+conditional probability density function \(p(x \mid z)\) and weighted by
+not a probability but rather a probability density \(p(z)\).
+
+In this case the marginal mixture model is defined not by summation but
+rather integration, \begin{align*}
+p(x)
+&=
+\int \mathrm{d} z \, p(z) \, p(x \mid z)
+\\
+&=
+\int \mathrm{d} z \, p(x \mid z) \, p(z).
+\end{align*}
+
+Because the assignment variables now take values in a continuous space
+mixture models of this form are, unsurprisingly, referred to as
+\textbf{continuous mixture models}.
+
+From a practical perspective continuous mixture models are a bit of a
+double-edged sword. On one hand the integration needed to evaluate the
+marginal model \(p(x)\) can be implemented analytically only in
+exceptional circumstances. On the other hand if \(X\) is also a
+continuous space then the joint model \(p(x, z)\) will be defined over a
+completely continuous product space and we can use gradient-based tools
+like Hamiltonian Monte Carlo to characterize it directly.
+
+\section{Bayesian Mixture Models}\label{bayesian-mixture-models}
+
+When working with probabilistic models defined over products spaces we
+have a variety of ways that we can employ mixture modeling. For example
+we can use mixtures to model the behavior of the entire product space.
+At the same time we can use mixtures to model the behavior of individual
+components or even products of specific components.
+
+This flexibility becomes especially useful in Bayesian modeling where
+our models are defined over a product of an observational space and a
+model configuration space. In particular we can apply mixture modeling
+techniques to both the prior model \(p( \theta )\) and observational
+model \(p(y \mid \theta)\).
+
+\subsection{Mixture Prior Models}\label{mixture-prior-models}
+
+Applied prior modeling is often constrained by our ability to express
+our intricate domain expertise with the mathematically-convenient, but
+relatively simple, probability density functions to which we might be
+limited in practice. That said when we don't have access to sufficiently
+flexible families of probability density functions we can often engineer
+some of the desired flexibility by combining the available probability
+density functions into mixture prior models, \[
+p(\theta) = \sum_{k = 1}^{K} \lambda_{k} \, p_{k}(\theta).
+\]
+
+For example let's say that we want to build a principled prior model for
+a behavior modeled by the parameter \(\theta\), but we have access to
+only normal probability density functions. In this case a unimodal
+normal prior model is sufficient only if we want to suppress parameter
+configurations outside of a single interval
+(Figure~\ref{fig-unimodal-good}).
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=0.33\textwidth,height=\textheight]{figures/mixture_priors/unimodal_good/unimodal_good.pdf}
+
+}
+
+\caption{\label{fig-unimodal-good}A single normal prior model is useful
+for quantifying domain expertise that is consistent with a connected
+interval of parameter configurations.}
+
+\end{figure}%
+
+If our domain expertise is consistent with parameter configurations that
+concentrate within multiple disjoint intervals, however, then no single
+normal prior model will be sufficient. We can build a normal prior model
+that captures any one interval, but only at the expense of the others
+(Figure~\ref{fig-unimodal-narrow}). At the same time a normal prior
+model that expands to contain \emph{all} of the consistent intervals
+will end up including the inconsistent behaviors in between
+(Figure~\ref{fig-unimodal-wide}). On the other hand a mixture of normal
+prior models can accommodate the disjoint intervals without issue
+(Figure~\ref{fig-multimodal-good}).
+
+\begin{figure}
+
+\begin{minipage}{0.33\linewidth}
+
+\centering{
+
+\captionsetup{labelsep=none}\includegraphics{figures/mixture_priors/unimodal_narrow/unimodal_narrow.pdf}
+
+}
+
+\subcaption{\label{fig-unimodal-narrow}}
+
+\end{minipage}%
+%
+\begin{minipage}{0.33\linewidth}
+
+\centering{
+
+\captionsetup{labelsep=none}\includegraphics{figures/mixture_priors/unimodal_wide/unimodal_wide.pdf}
+
+}
+
+\subcaption{\label{fig-unimodal-wide}}
+
+\end{minipage}%
+%
+\begin{minipage}{0.33\linewidth}
+
+\centering{
+
+\captionsetup{labelsep=none}\includegraphics{figures/mixture_priors/multimodal_good/multimodal_good.pdf}
+
+}
+
+\subcaption{\label{fig-multimodal-good}}
+
+\end{minipage}%
+
+\caption{\label{fig-mixture-priors-multimodal}A single normal prior
+model is less useful for quantifying domain expertise that is consistent
+with multiple, disconnected intervals of parameter configurations. The
+best we can do is engineer a normal prior model (a) that concentrates on
+one of the intervals but neglects the others (b) or spans all of the
+intervals but includes all of the inconsistent configurations between
+them. (c) Multiple normal prior models, however, can be combined into a
+mixture prior model that readily accommodates the disjoint domain
+expertise.}
+
+\end{figure}%
+
+Mixture models can also be useful for engineering more sophisticated
+unimodal behaviors. For example we can use a mixture of normal prior
+models to approximate more leptokurtic or ``heavy-tailed'' behaviors
+(Figure~\ref{fig-leptokurtic}), platykurtic or ``light-tailed''
+behaviors (Figure~\ref{fig-platykurtic}), and even asymmetric behaviors
+(Figure~\ref{fig-asymmetric}).
+
+\begin{figure}
+
+\begin{minipage}{0.33\linewidth}
+
+\centering{
+
+\captionsetup{labelsep=none}\includegraphics{figures/mixture_priors/leptokurtic/leptokurtic.pdf}
+
+}
+
+\subcaption{\label{fig-leptokurtic}}
+
+\end{minipage}%
+%
+\begin{minipage}{0.33\linewidth}
+
+\centering{
+
+\captionsetup{labelsep=none}\includegraphics{figures/mixture_priors/platykurtic/platykurtic.pdf}
+
+}
+
+\subcaption{\label{fig-platykurtic}}
+
+\end{minipage}%
+%
+\begin{minipage}{0.33\linewidth}
+
+\centering{
+
+\captionsetup{labelsep=none}\includegraphics{figures/mixture_priors/asymmetric/asymmetric.pdf}
+
+}
+
+\subcaption{\label{fig-asymmetric}}
+
+\end{minipage}%
+
+\caption{\label{fig-mixture-priors}Mixture prior models can be used to
+engineer more sophisticated behavior from simpler component models. For
+example a mixture of normal prior models can be more (a) heavy-tailed,
+(b) light-tailed, or (c) asymmetric than any single normal prior model.}
+
+\end{figure}%
+
+All of this said, multimodal domain expertise is not particularly common
+in practice. Unimodal domain expertise that cannot be captured by a
+normal prior model is more common but, with the benefit of expressive
+probabilistic programming languages and contemporary probabilistic
+computation tools, we can usually implement sufficiently flexible
+probability density functions directly. Prior mixture modeling was much
+more useful in times past when Bayesian analyses were limited to
+calculations that could be made analytically or with limited
+computational resources.
+
+Continuous mixture prior models, however, still play a critical role in
+the modeling of domain expertise subject to certain ignorance
+constraints, as we'll learn about in the chapter on
+\href{https://betanalpha.github.io/assets/case_studies/hierarchical_modeling.html}{hierarchical
+modeling}.
+
+\subsection{Mixture Observational
+Models}\label{mixture-observational-models}
+
+One of the most powerful uses of mixtures models in Bayesian analyses is
+engineering observational models that combine multiple data generating
+processes together, \[
+p(y \mid \theta) = \sum_{k = 1}^{K} \lambda_{k} \, p_{k}(y \mid \theta),
+\] when we don't know which might be responsible for any given
+observation. These mixture observational models allow us to, for
+example, model measurements that have been contaminated by undesired but
+unavoidable behaviors, a situation that arises all too often in
+practice.
+
+For example if \(p_{s}(y \mid \theta_{s})\) models a desired signal and
+\(p_{b}(y \mid \theta_{b})\) models an irreducible background then the
+mixture observational model \[
+p(y \mid \theta_{s}, \theta_{b}) =
+       \lambda_{s}  \, p_{s}(y \mid \theta_{s})
++ (1 - \lambda_{s}) \, p_{b}(y \mid \theta_{b})
+\] models their overlap, allowing us to \emph{probabilistically}
+separate the signal from the background.
+
+Similarly consider a normal observational model
+\(\text{normal}(y \mid, \mu, \sigma)\) where the measurement variability
+\(\sigma\) can vary unpredictably from measurement to measurement. If we
+can quantify the distribution of measurement variabilities then we can
+model this data generating behavior with a continuous mixture model, for
+example \begin{align*}
+p(y \mid \mu, \tau)
+&=
+\int_{0}^{\infty} \mathrm{d} z \,
+\text{normal} \bigg(y \mid \mu, \sqrt{z} \bigg) \,
+\text{exponential} \bigg( z \mid \frac{1}{2 \tau^{2}} \bigg)
+\\
+&=
+\text{Laplace}(y \mid \mu, \tau).
+\end{align*}
+
+While mathematically convenient, taking exponentially distributed
+squared measurement variabilities is a strong assumption that we usually
+don't have the domain expertise to confidently motivate. Instead in
+practice this Laplace observational model is often used more
+heuristically to accommodate extreme ``outliers'' that contaminate the
+real-valued observations of interest.
+
+\section{Mixture Observational Model
+Inferences}\label{mixture-observational-model-inferences}
+
+In practice mixture observational models are typically used in
+applications where the neither the component observational models nor
+their probabilities are known precisely. Consequently the inferential
+challenge is to infer all of these behaviors from the observed data
+\emph{at the same time}.
+
+Theoretically we can always infer the component observational model
+behaviors jointly with the unknown component assignments, \begin{align*}
 p(\mathbf{z}, \boldsymbol{\lambda}, \boldsymbol{\theta}
  \mid \tilde{\mathbf{y}} )
 &\propto
@@ -1225,7 +1561,7 @@ p_{k}(\tilde{y}_{n} \mid \theta_{k} ) \, \lambda_{k}
 \bigg] \,
 p( \boldsymbol{\lambda} ) \, p( \boldsymbol{\theta} ).
 \end{align*} When needed any component assignment can always be
-recovered from the corresponding posterior distribution, \[
+recovered with an application of Bayes' Theorem, \[
 p(z_{n} = k \mid
   \tilde{y}_{n}, \boldsymbol{\lambda}, \boldsymbol{\theta})
 =
@@ -1236,10 +1572,11 @@ p_{k}(\tilde{y}_{n} \mid \theta_{k}) \, \lambda_{k}
 }.
 \]
 
-From a mathematical perspective the behavior of mixture model inferences
-is relatively straightforward. For example if the configuration of the
-component models are fixed then any observations that are more
-consistent with a particular component model, \[
+From a mathematical perspective the behavior of mixture observational
+model inferences is relatively straightforward. For example if the
+configurations of the component observational models are fixed then any
+observations that are more consistent with a particular component model,
+\[
 \frac
 { \mathrm{d} \pi_{k , \theta_{k}}  }
 { \mathrm{d} \pi_{k', \theta_{k'}} } (\tilde{y}_{n})
@@ -1255,21 +1592,21 @@ the remaining \(\lambda_{k'}\).
 More generally the posterior distribution will have to account for the
 interactions between the component probabilities
 \(\boldsymbol{\lambda}\) and the component model configuration
-parameters \(\boldsymbol{\theta}\). When the component models are not
-too redundant, with each component model responsible for a mostly unique
-set of behaviors, then then these interactions will manifest as
-non-degenerate posterior distribution that are straightforward to
-quantify with tools like Hamiltonian Monte Carlo.
+parameters \(\boldsymbol{\theta}\). When the component observational
+models are not too redundant, with each component model responsible for
+a mostly unique set of behaviors, then then these interactions will
+manifest as non-degenerate posterior distribution that are
+straightforward to quantify with tools like Hamiltonian Monte Carlo.
 
-If the component models exhibit substantial redundancy, however, then
-the resulting posterior inferences will be much less pleasant. The
-problem is that the mixture model will be able to contort itself in a
-variety of different ways to match the observed data. This yields
-complex, and often multi-modal, degeneracies that greatly frustrate
-accurate posterior computation. Recall that multi-modal degeneracies are
-particularly obstructive as Markov chains with poorly chosen
-initializations can be trapped by even sub-dominant modes
-(Figure~\ref{fig-multimodal}).
+If the component observational models exhibit substantial redundancy,
+however, then the resulting posterior inferences will be much less
+pleasant. The problem is that the mixture observational model will be
+able to contort itself in a variety of different ways, all of which are
+consistent with the observed data. This yields complex, and often
+multi-modal, degeneracies that frustrate accurate posterior computation.
+Recall that multi-modal degeneracies are particularly obstructive as
+Markov chains with poorly chosen initializations can be trapped by even
+small modes (Figure~\ref{fig-multimodal}).
 
 \begin{figure}
 
@@ -1280,20 +1617,19 @@ initializations can be trapped by even sub-dominant modes
 }
 
 \caption{\label{fig-multimodal}Multi-modal posterior distributions are
-especially frustrating to Markov chain Monte Carlo. No matter how little
-probability is allocated to a mode it can still attract Markov chains
-for arbitrarily long times if they are initialized too close to its
-basin of attraction.}
+especially frustrating for Markov chain Monte Carlo. No matter how
+little target probability is allocated to the neighborhood of a mode it
+can still attract Markov chains for arbitrarily long times if the Markov
+chains are initialized too close to its basin of attraction.}
 
 \end{figure}%
 
-Redundancy in a mixture model is at its highest when two or more of the
-component models are exchangeable, in particular when they span the same
-family of probability density functions. In this case we can permute the
-corresponding component indices \emph{without affecting any of the model
-evaluations}. If \(K_{e}\) component models are exchangeable then the
-likelihood function will always exhibit \(K_{e}!\) distinct modes, one
-for each permutation of the redundant indices
+Redundancy in a mixture observational model is at its highest when two
+or more of the component observational models are the same. In this case
+we can permute the corresponding component indices \emph{without
+affecting any of the model evaluations}. If \(K_{r}\) component models
+are the same then the likelihood function will always exhibit \(K_{r}!\)
+distinct modes, one for each permutation of the redundant indices
 (Figure~\ref{fig-label-switching}).
 
 \begin{figure}
@@ -1346,32 +1682,36 @@ for each permutation of the redundant indices
 \begin{minipage}{0.05\linewidth}
 ~\end{minipage}%
 
-\caption{\label{fig-label-switching}Exchangeable mixture models with
-\(K\) components are formally non-identified -- every model
-configuration is accompanied by \(K! - 1\) other model configurations
-that define exactly the same data generating process, each found in a
-different mode. For example a mixture model with two identical normal
-component models always results in (a) a bimodal likelihood function
-where (b) every model configuration in one mode is paired with (c) a
-model configuration in another mode where the components are swapped.}
+\caption{\label{fig-label-switching}Mixture observational models with
+\(K\) equal component observational models are formally non-identified
+-- every model configuration is accompanied by \(K! - 1\) other model
+configurations that define exactly the same observational model. These
+redundant model configurations manifest as distinct modes in the
+likelihood function; for example a mixture observational model with two
+identical normal component models always results in (a) a bimodal
+likelihood function where (b) every model configuration in one mode is
+paired with (c) a model configuration in another mode where the
+component models are swapped.}
 
 \end{figure}%
 
-That said non-exchangeable mixture models are not guaranteed to be
-well-behaved either. Degeneracies can also arise when component models
-are mathematically distinct but contain similar qualitative behaviors.
-Consider, for example, a mixture model over positive integers that
-inflates a baseline Poisson model, \(\mathrm{Poisson}(y \mid \lambda)\),
-with a Dirac probability distribution concentrating at zero,
-\(\delta_{0}(y)\).
+That said non-redundant mixture observational models are not guaranteed
+to be well-behaved either. Degeneracies can also arise when component
+observational models are mathematically distinct but contain similar
+qualitative behaviors.
 
-If \(\lambda\) is far from zero then these two components exhibit
+Consider, for example, a mixture observational model over positive
+integers that inflates a baseline Poisson model,
+\(\mathrm{Poisson}(y \mid \lambda)\), with a Dirac probability
+distribution concentrating at zero, \(\delta_{0}(y)\).
+
+If \(\lambda\) is far from zero then these two component model capture
 distinct behaviors, with the former concentrating on values above zero
 and the latter on values exactly at zero
 (Figure~\ref{fig-zip_degen-separated}). When \(\lambda\) is close to
 zero, however, the two component models will both concentrate at zero
-(Figure~\ref{fig-zip_degen-overlapping}). In this case observations
-\(y = 0\) cannot distinguish between the two components.
+(Figure~\ref{fig-zip_degen-overlapping}) and observations of \(y = 0\)
+will be able to distinguish between them.
 
 \begin{figure}
 
@@ -1402,27 +1742,28 @@ zero, however, the two component models will both concentrate at zero
 
 \end{minipage}%
 
-\caption{\label{fig-zip_degen}Discrete inflation models are prone to
-degeneracies when the baseline component can contort itself to mimic the
-inflated component. (a) When \(\lambda\) is much larger than zero a
-Poisson model is not easily confused with a Dirac model concentrating at
-zero. (b) If \(\lambda\) is close to zero, however, then the two
-component models are nearly indistinguishable.}
+\caption{\label{fig-zip_degen}Discrete inflation observational models
+are prone to degeneracies when the baseline model can contort itself to
+mimic the inflation model. (a) When \(\lambda\) is much larger than zero
+a Poisson model is not easily confused with a Dirac model concentrating
+at zero. (b) If \(\lambda\) is close to zero, however, then the two
+component observational models are nearly indistinguishable.}
 
 \end{figure}%
 
-In my opinion the most productive approach to mixture modeling is to
-treat each component as a model for a distinct data generating process.
-Any domain expertise that distinguishes the possible outputs from these
-data generating processes can then be directly incorporated into either
-the structure of the component models or the prior model to avoid as
-much inferential degeneracy as possible.
+In my opinion the most productive approach to mixture observational
+modeling is to treat each component as a model for a distinct data
+generating process. Any domain expertise that distinguishes the possible
+data generating behaviors from each other can, and should, be directly
+incorporated into either the structure of the component observational
+models or the prior model to avoid as much inferential degeneracy as
+possible.
 
 \section{Demonstrations}\label{demonstrations}
 
 Enough of the generality. In this section we'll demonstrate the basic
-mixture modeling techniques presented so in this chapter in specific
-exercises.
+mixture modeling techniques presented in this chapter with a sequence of
+demonstrative Bayesian applications using mixture observational models.
 
 \subsection{Setup}\label{setup}
 
@@ -1454,17 +1795,19 @@ Background}\label{separating-signal-and-background}
 
 For our first exercise let's consider a simplified version of a particle
 physics experiment where we observe individual energy depositions in a
-detector. These source of these depositions can be either an irreducible
-background or a signal of interest. We'll model the background with a
-steeply falling exponential probability density function and the signal
-with a Cauchy probability density function that can be derived from
-certain physical processes.
+detector. The only problem is that each depositions can come from either
+an irreducible background or a signal of interest, and we are always
+ignorant to which source is responsible for any given deposition.
+Fortunately we can model this overlap of signal and background sources
+with a mixture observational model.
 
-Unsurprising given the context of this chapter we can model the overlap
-of signal and background with a mixture model. The precise configuration
-of the signal and background models here is arbitrary, especially
-without units. That said the high background probability is emulative of
-actual particle physics experiments.
+We'll model the background with a steeply falling exponential
+probability density function and the signal with a Cauchy probability
+density function that can be derived as an approximation to certain
+physical processes. The precise configuration of the signal and
+background models in this example is somewhat arbitrary, especially
+without units. That said the high background probability and peaked
+signal is emulative of actual particle physics experiments.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -1541,7 +1884,7 @@ introduced in \hyperref[sec:sampling]{Section 1.4}.
 \end{Shaded}
 
 Because of the overwhelming background contribution it's hard to make
-out the meager signal.
+out the meager signal by eye.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -1560,11 +1903,11 @@ above the binning.
 
 Perhaps we can use Bayesian inference to tease out the signal?
 
-Note that the prior model here is somewhat arbitrary due to the nature
-of the exercise. In a practical analysis we would want to take care to
-elicit at least some basic domain expertise about the behaviors captured
-by each parameter. This is especially true if the component models have
-any potential for redundant behaviors.
+Note that the prior model here is a bit arbitrary due to the nature of
+the exercise. In a practical analysis we would want to take care to
+elicit at least some basic domain expertise about the behaviors of each
+component observational model. This is especially true if the component
+models have any potential for redundant behaviors.
 
 \begin{codelisting}
 
@@ -1627,8 +1970,8 @@ any potential for redundant behaviors.
 \end{Shaded}
 
 The diagnostics exhibit some mild \(\hat{\xi}\) warnings, but nothing
-too concerning so long as we're not interested in the expectation value
-of \texttt{mu\_signal}.
+too concerning so long as we're not interested in calculating the
+expectation value of \texttt{mu\_signal}.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -1689,7 +2032,7 @@ value"): 1 observed value (0.2%) fell above the binning.
 
 Our posterior inferences are not too bad, especially considering the
 relatively small number of observations and overwhelming background
-contribution. Note also the heavy tails of marginal posterior
+contribution. Note also the heavy tails of the marginal posterior
 distribution for \texttt{mu\_signal}, consistent with the \(\hat{\xi}\)
 warnings.
 
@@ -1822,9 +2165,8 @@ resolve the underlying signal through the overwhelming background!
 In many scientific applications the relative proportion of signal and
 background, and hence the component probabilities, are more relevant
 than the probability that any particular observation arose from either
-source. That said if the latter is of interest then we computing
-posterior assignment probabilities and simulating assignments is
-straightforward.
+source. Fortunately when the latter is of interest computing posterior
+assignment probabilities and simulating assignments is straightforward.
 
 \begin{codelisting}
 
@@ -1888,9 +2230,9 @@ straightforward.
 
 Because the modified \texttt{generated\ quantities} block consumes
 pseudo-random numbers differently we need to double check the
-computational diagnostics. We do see a step adaptation warning which
-suggests that the adaptation has changed in one of the Markov chains,
-but on its own this isn't too problematic.
+computational diagnostics. We do see a step size adaptation warning
+which suggests that the adaptation has changed in one of the Markov
+chains, but on its own this isn't too problematic.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -1900,8 +2242,8 @@ but on its own this isn't too problematic.
 \end{Shaded}
 
 \begin{verbatim}
-  Chain 1: Averge proxy acceptance statistic (0.676) is
-           smaller than 90% of the target (0.801).
+  Chain 1: Average proxy acceptance statistic (0.676)
+           is smaller than 90% of the target (0.801).
 
   A small average proxy acceptance statistic indicates that the
 adaptation of the numerical integrator step size failed to converge.
@@ -1991,9 +2333,9 @@ quantify the behavior of individual observations.
 Model}\label{zero-inflated-poisson-model}
 
 To demonstrate discrete inflation models let's next consider a
-zero-inflated Poisson model, often affectionately referred to as a
-``ZIP''. Once again we begin by simulating data from a particular
-configuration of the model.
+zero-inflated Poisson observational model, often affectionately referred
+to as a ``ZIP''. Once again we begin by simulating data from a
+particular configuration of the model.
 
 \begin{codelisting}
 
@@ -2025,7 +2367,7 @@ configuration of the model.
 \end{codelisting}
 
 Let's start by simulating data from a configuration where the two
-component probability distributions are well-separated.
+component models are well-separated.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -2147,9 +2489,9 @@ All expectands checked appear to be behaving well enough for reliable
 Markov chain Monte Carlo estimation.
 \end{verbatim}
 
-A retrodictive check with a histogram summary statistic also looks good.
-That said retrodictive checks tend to be pretty well-behaved when we're
-fitting data simulated from the same model!
+A retrodictive check with a histogram summary statistic also looks good,
+although retrodictive checks will always be pretty well-behaved when
+we're fitting data simulated from the same model!
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -2281,8 +2623,8 @@ sufficiently integrable.
 \end{verbatim}
 
 Following best practices we'll follow up on the divergences by examining
-relevant pairs plots. Fortunately here there's only two parameters and
-hence one possible pairs plot to consider.
+some relevant pair plots. Fortunately here there are only two parameters
+and hence one possible pair plot to consider.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -2293,24 +2635,24 @@ hence one possible pairs plot to consider.
 
 \includegraphics{mixture_modeling_files/figure-pdf/unnamed-chunk-27-1.pdf}
 
-Beyond the scattered divergences an immediate take away from this plot
-is the extreme posterior uncertainties. The zero-inflated Poisson model
-can accommodate zeros in two distinct ways. Firstly it can push
-\(\lambda\) to zero, turning off the baseline Poisson component but also
-leaving the intensity parameter \(\mu\) uninformed beyond the prior
-model. Secondly it can push \(\mu\) to zero so that the two component
-models become redundant, in which case \(\lambda\) becomes uninformed
-beyond the prior model. Ultimately the zero-inflated Poisson model with
-our initial, diffuse prior model is just too flexible to yield
-well-behaved inferences.
+One immediate take away from this plot is the extreme posterior
+uncertainties. The zero-inflated Poisson observational model can
+accommodate zeros in two distinct ways. Firstly it can push \(\lambda\)
+to zero, turning off the baseline Poisson component but also leaving the
+intensity parameter \(\mu\) uninformed beyond the prior model. Secondly
+it can push \(\mu\) to zero so that the two component models become
+redundant, in which case \(\lambda\) becomes uninformed beyond the prior
+model. Ultimately the zero-inflated Poisson model with our initial,
+diffuse prior model is just too flexible to yield well-behaved
+inferences.
 
 One way to avoid these strong uncertainties, and the resulting strain on
-our posterior computation, is to constrain the mixture model with
-additional domain expertise. For example any information on the strength
-of the inflation can inform a more concentrated prior model for
-\(\lambda\). Similarly any information on the precise value of \(\mu\)
-may be able to avoid configurations where the two component models
-overlap.
+the posterior computation, is to constrain the mixture observational
+model with additional domain expertise. For example any information on
+the strength of the inflation can inform a more concentrated prior model
+for \(\lambda\). Similarly any information on the precise value of
+\(\mu\) may be able to suppress configurations where the two component
+models overlap.
 
 Here let's assume that our domain expertise is inconsistent with values
 of \(\mu\) below one. The only problem is that we now need a prior model
@@ -2324,7 +2666,7 @@ with the inverse gamma family as it more heavily suppresses the smaller
 values of \(\mu\) where we know the component models become redundant.
 
 To inform a particular inverse gamma configuration we can use Stan's
-algebraic solver to find the configuration matching the desired tail
+algebraic solver to find the configuration matching our desired tail
 behaviors.
 
 \begin{codelisting}
@@ -2472,7 +2814,7 @@ With a more informative prior model in hand let's try again.
 \end{Highlighting}
 \end{Shaded}
 
-There is a lone \(\hat{\xi}\) warning but at the same time the
+There is a lone \(\hat{\xi}\) warning, but more importantly the
 divergences are gone.
 
 \begin{Shaded}
@@ -2504,7 +2846,7 @@ Large tail hat{xi}s suggest that the expectand might not be
 sufficiently integrable.
 \end{verbatim}
 
-Taking a quick look at the one relevant pairs plot we see that the
+Taking a quick look at the one relevant pair plot we see that the
 stronger prior model entirely suppresses the ridge where \(\mu\) is
 small and \(\lambda\) is poorly informed.
 
@@ -2519,7 +2861,7 @@ small and \(\lambda\) is poorly informed.
 
 That said while the posterior geometry is more well-behaved the
 inferences still leave much to desired. In particular with this more
-informative prior model the zero-observations no longer inform \(\mu\).
+informative prior model the observations no longer inform \(\mu\).
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -2543,21 +2885,24 @@ informative prior model the zero-observations no longer inform \(\mu\).
 Model}\label{zeroone-inflated-beta-model}
 
 Now let's explore what happens when we try to inflate a continuous
-baseline model. Continuous inflation models are particularly useful for
-modeling contamination in a data generating process, such as data-entry
-errors or data-coding conventions for unexpected or corrupted outcomes.
-For example data entry software that fills in all entries with zeros
-before allowing a user to overwrite that default value will give excess
-zeros if the user fails to enter all observed values.
+baseline observational model. Continuous inflation models are often
+useful for modeling contamination in a data generating process, such as
+data-entry errors or unexpected/corrupted outcomes that have been coded
+with default values. For example data entry software that fills in all
+entries with zeros before allowing a user to overwrite that default
+value will give excess zeros if the user fails to enter all observed
+values. Similar missing observations that are coded with zero will also
+result in an excess of zeros.
 
-Specifically let's inflate both zero and one values in baseline beta
-model, giving what is known as a zero/one-inflated beta model. While
-less conventional than ``ZIP'' for a zero-inflated Poisson model, the
-short-hand ``ZOIB'' for this model is advocated by a small but
-passionate group.
+Here let's inflate both zero and one values in baseline beta
+observational model, giving what is known as a zero/one-inflated beta
+model. While less conventional than ``ZIP'' for a zero-inflated Poisson
+model, the short-hand ``ZOIB'' for this model is advocated by a small
+but passionate group.
 
-Simulating data from a continuous inflation model proceeds exactly the
-same as for a discrete mixture model, and indeed any mixture model.
+Simulating data from a continuous inflation observational model proceeds
+exactly the same as for a discrete mixture model, and indeed any mixture
+model.
 
 \begin{codelisting}
 
@@ -2657,10 +3002,10 @@ the cumulative probabilities.
 
 \includegraphics{mixture_modeling_files/figure-pdf/unnamed-chunk-36-1.pdf}
 
-As discussed in \hyperref[sec:cont_infl]{Section 2.2} the implementation
-of a continuous inflation model requires treating the inflation values
-as a discrete space separate from the other values. Conveniently there
-are two ways to handle this.
+As discussed in \hyperref[sec:cont_infl]{Section 2.1.2} the
+implementation of a continuous inflation model requires treating the
+inflation values as a discrete space separate from the other values.
+There are two ways to handle this.
 
 Firstly we can model the inflated and non-inflated values jointly.
 
@@ -2804,10 +3149,11 @@ to simulate the data.
 
 \includegraphics{mixture_modeling_files/figure-pdf/unnamed-chunk-40-1.pdf}
 
-Because we have three components we can directly visualize the simplex
-of component probabilities, instead of for example having to visualize
-the behavior of each component independently and neglecting the simplex
-constraints.
+Because we have three component models we can directly visualize the
+simplex of component probabilities. This offers a much more complete
+picture of our inferences than trying to visualize the marginal
+inferences for each component probability independently and neglecting
+the simplex constraints.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -2869,7 +3215,7 @@ constraints.
 \end{Highlighting}
 \end{Shaded}
 
-This allows us to clearly see the marginal posterior distribution for
+With this visualization we can clearly see the posterior inferences for
 the component probabilities concentrating around the true value.
 
 \begin{Shaded}
@@ -2886,7 +3232,7 @@ the component probabilities concentrating around the true value.
 \includegraphics{mixture_modeling_files/figure-pdf/unnamed-chunk-42-1.pdf}
 
 While the joint model works well we can also fit the inflated and
-non-inflated values independently of each other.
+non-inflated observations independently of each other.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -3067,24 +3413,26 @@ consistent up to the expected Markov chain Monte Carlo variation.
 \includegraphics{mixture_modeling_files/figure-pdf/unnamed-chunk-47-1.pdf}
 
 If the inflated values are modeling some undesired contamination and we
-are interested in only the behavior of the continuous baseline model
-then we can always fit the baseline model to the non-inflated values
-directly and ignore the inflated values entirely. Similarly if we are
-interested in only the prevalence of inflated values then we can fit the
-component probabilities to the counts directly, ignoring the precise
-value of the continuous observations.
+are interested in only the behavior of the continuous baseline
+observational model then we can always fit the baseline model to the
+non-inflated values and ignore the inflated values entirely. Similarly
+if we are interested in only the prevalence of inflated values then we
+can fit the component probabilities to the counts directly, ignoring the
+precise value of the continuous observations.
 
-\subsection{Exchangeable Mixture
-Model}\label{exchangeable-mixture-model}
+\subsection{Redundant Mixture Model}\label{redundant-mixture-model}
 
-To avoid any ambiguity let me make it clear that I do not recommend
-exchangeable mixture models in applied practice. Without some way of
+To avoid any ambiguity let me emphasize that I do not recommend using
+redundant mixture models in applied practice. Without some way of
 distinguishing the component probability distributions mixture models
-are inherently prone to degenerate inferences that frustrate meaningful
+are inherently prone to degenerate inferences that impede meaningful
 insights.
 
-That said in this section we'll explore an exchangeable mixture of
-normal component models, if only to see how problematic they can be.
+That said, in this section we will explore a redundant mixture of normal
+observational models to see just how problematic redundancy can be in
+mixture models. If you're not tempted to use redundant mixture models in
+your own analyses then please feel free to skim if not skip this
+section!
 
 At the very least the simulation of data is straightforward.
 
@@ -3134,7 +3482,7 @@ At the very least the simulation of data is straightforward.
 \end{Shaded}
 
 A histogram of the data clearly shows at least two peaks, with the
-possibility of the second peak separating into two peaks of its own.
+possibility of the second peak maybe separating into two more peaks.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -3149,10 +3497,9 @@ possibility of the second peak separating into two peaks of its own.
 \subsubsection{Unknown Component
 Probabilities}\label{unknown-component-probabilities}
 
-Recall that exchangeablity is a property of our knowledge of the system.
-If we know the true configuration of the component mixture models, so
-that all we have to infer are the component probabilities, then the
-mixture model is not actually exchangeable.
+If we know the true configuration of the component observational models,
+so that all we have to infer are the component probabilities, then the
+components will not actually be redundant.
 
 \begin{codelisting}
 
@@ -3239,9 +3586,9 @@ All expectands checked appear to be behaving well enough for reliable
 Markov chain Monte Carlo estimation.
 \end{verbatim}
 
-The posterior retrodictive check not only shows no signs of model
-inadequacy but also shows that our model infers three distinct peaks
-from the observed data.
+The posterior retrodictive check shows not only shows signs of model
+inadequacy but also that our model infers three distinct peaks from the
+observed data.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -3282,9 +3629,9 @@ Locations}\label{unknown-component-probabilities-and-locations}
 Let's now complicate the situation by leaving the component scales fixed
 but trying to infer the component locations. Because the component
 scales are not all equal to each other the resulting mixture model is
-not completely exchangeable. That said the entire mixture model is
-approximately exchangeable, and the latter two components on their own
-are exactly exchangeable.
+not completely redundant. That said the components are all pretty
+similar, and the latter two components are exactly redundant with each
+other.
 
 \begin{codelisting}
 
@@ -3392,10 +3739,10 @@ Split Rhat larger than 1.1 suggests that at least one of the Markov
 chains has not reached an equilibrium.
 \end{verbatim}
 
-Indeed the pairs plots show at least three distinct posterior modes,
-although counting modes based on two-dimensional projections is not
-always straightforward. Moreover there could easily be more modes that
-our Markov chains missed.
+Indeed a selection of pair plots suggest at least three distinct
+posterior modes, although accurately counting modes based on
+two-dimensional projections is always tricky. Moreover there could
+easily be more modes that our Markov chains missed.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -3429,13 +3776,13 @@ to have fallen into distinct modes we'll focus on those going forwards.
 \includegraphics{mixture_modeling_files/figure-pdf/unnamed-chunk-58-1.pdf}
 
 The propensity for individual modes to capture entire Markov chains is
-both why we cannot accurately estimate the relative important of each
+both why we cannot accurately estimate the relative importance of each
 mode and why running many independent Markov chains is the most
 practical way to diagnose multi-modality.
 
 To understand the behavior within each mode let's explore the inferred
-component behaviors within individual Markov chains, and hence within
-individual modes.
+component behaviors within each individual Markov chain, and hence
+within individual modes.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -3545,12 +3892,12 @@ Warning in check_bin_containment(bin_min, bin_max, collapsed_values,
 
 Because of the multi-modality, however, it's a bit more fair to look at
 the retrodictive performance within individual Markov chain. Here we see
-that the retrodictive performance from the first Markov chains is
-similar to, but not exactly the same as, that from the second and third
-Markov chains, consistent with the inferred component behaviors.
-Moreover the retrodictive performance in the second and third Markov
-chains is the same, consistent with the corresponding modes capturing
-model configurations that are exact permutations of each other.
+that the retrodictive performance from the first Markov chain is similar
+to, but not exactly the same as, that from the second and third Markov
+chains, consistent with the inferred component behaviors. Moreover the
+retrodictive performance in the second and third Markov chains is the
+same, consistent with the corresponding modes capturing model
+configurations that are exact permutations of each other.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -3585,7 +3932,7 @@ Warning in check_bin_containment(bin_min, bin_max, collapsed_values,
 One of the posterior modes does appear to have captured the true model
 configuration, although again because we cannot rely on the relative
 weights of those modes we can't be certain how much the exact posterior
-distribution prefers that mode over the others.
+distribution prefers that one correct mode over the others.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -3617,11 +3964,10 @@ distribution prefers that mode over the others.
 
 \includegraphics{mixture_modeling_files/figure-pdf/unnamed-chunk-63-2.pdf}
 
-Even if the observational model is exchangeable we can prevent the full
-Bayesian model from being exchangeable with an asymmetric prior model.
+If the observational model is redundant we can in theory prevent the
+full Bayesian model from being redundant with an asymmetric prior model.
 Here let's assume that we have domain expertise that constrains the
-location of the component models to non-overlapping intervals,
-\begin{align*}
+location of each component models to disjoint intervals, \begin{align*}
 -6 \lessapprox & \; \mu_{1} \lessapprox -2
 \\
 -2 \lessapprox & \; \mu_{2} \lessapprox +2
@@ -3743,7 +4089,7 @@ Indeed the multi-modality persists.
 \includegraphics{mixture_modeling_files/figure-pdf/unnamed-chunk-66-1.pdf}
 
 In fact one of the modes concentrates on model configurations with
-\(\mu_{3} < \mu_{2}\), directly contrasting with the structure of the
+\(\mu_{3} < \mu_{2}\), directly contrasting with the behavior of the
 prior model!
 
 \begin{Shaded}
@@ -3782,14 +4128,14 @@ second and third component models entirely.
 The problem here is that, while strong prior models can suppress
 redundant or otherwise unwanted modes, they cannot eliminate them
 entirely. Consequently any modes in the likelihood function will persist
-into the posterior distribution, trapping Markov chains that get too
-close.
+into the posterior distribution and potentially trapping any Markov
+chains that get too close.
 
 One way that we can eliminate the undesired modes is to remove entire
 regions of the model configuration space. For a mixture of
-one-dimensional normal models we can impose an ordering constraint on
-the component locations that completely removes all but one permutation
-of the component models. Effectively the ordering eliminates the
+one-dimensional normal models an ordering constraint on the component
+locations completely removes all but one permutation of the redundant
+component models. In other words the ordering effectively eliminates the
 redundancy without limiting the desired flexibility of the model.
 
 \begin{codelisting}
@@ -3849,7 +4195,7 @@ redundancy without limiting the desired flexibility of the model.
 \end{Highlighting}
 \end{Shaded}
 
-Encouragingly all of the diagnostic warnings have ceased.
+Encouragingly, all of the diagnostic warnings have ceased.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -3922,9 +4268,9 @@ Warning in check_bin_containment(bin_min, bin_max, collapsed_values,
 
 \includegraphics{mixture_modeling_files/figure-pdf/unnamed-chunk-72-1.pdf}
 
-With no signs of inadequacies we can analyze our posterior inferences.
-Conveniently they all concentrate around the true behavior of the
-simulation data generating process.
+With no signs of model inadequacies we can analyze our posterior
+inferences. Conveniently they all concentrate around the true behavior
+of the simulation data generating process.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -3958,10 +4304,10 @@ simulation data generating process.
 \subsubsection{Unknown Component Probabilities, Locations, and
 Scales}\label{unknown-component-probabilities-locations-and-scales}
 
-Why don't we push the analysis even further and try to infer \emph{all}
-of the component model configurations at the same time. In this case
-nothing distinguishes the component models from each other. The model
-has reached peak exchangeability.
+Now let's push the analysis even further and try to infer \emph{all} of
+the component parameters at the same time. In this case nothing
+distinguishes the component models from each other; the model has
+reached peak redundancy.
 
 \begin{codelisting}
 
@@ -4077,7 +4423,7 @@ Split Rhat larger than 1.1 suggests that at least one of the Markov
 chains has not reached an equilibrium.
 \end{verbatim}
 
-Examining some pairs plots we can see the horde of modes responsible for
+Examining some pair plots we can see the horde of modes responsible for
 the split \(\hat{R}\) warnings.
 
 \begin{Shaded}
@@ -4203,8 +4549,8 @@ can see that all of these modes appear to be permutations of each other.
 
 \includegraphics{mixture_modeling_files/figure-pdf/unnamed-chunk-79-2.pdf}
 
-Can breaking the exchangeability with an ordering on the component
-locations resolve some of this degeneracy?
+Can breaking the redundancy with an ordering on the component locations
+resolve some of this degeneracy?
 
 \begin{codelisting}
 
@@ -4265,8 +4611,8 @@ locations resolve some of this degeneracy?
 \end{Highlighting}
 \end{Shaded}
 
-Well we don't see quite as many split \(\hat{R}\) warnings, so perhaps
-we've made some progress.
+We don't see quite as many split \(\hat{R}\) warnings, so perhaps we've
+made some progress.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -4317,7 +4663,7 @@ Split Rhat larger than 1.1 suggests that at least one of the Markov
 chains has not reached an equilibrium.
 \end{verbatim}
 
-It looks like we may be down to just two modes.
+Indeed it looks like we may be down to just two modes.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -4373,13 +4719,14 @@ something interesting.
 \includegraphics{mixture_modeling_files/figure-pdf/unnamed-chunk-83-2.pdf}
 
 The first, third, and fourth Markov chains exhibit the ideal behavior,
-with each component matching the behavior of the true component data
-generating processes. In the second Markov chain, however, the first
-component model moves up to capture the second true component data
-generating process. Because of the ordering constraint this pushes the
-second component model up. The second component model then uses the
+with each component matching the behavior of one of the component
+simulation data generating processes. In the second Markov chain,
+however, the first component observational model moves up to capture the
+second component simulation data generating process. Because of the
+ordering constraint this pushes the second component observational model
+up as well. The second component observational model then uses the
 pliability of the component scales to expand and cover the observed data
-at smaller values that the first component missed.
+at smaller values that the first component observational model missed.
 
 This latter contortion is less consistent with the observed data, which
 we can see in the corresponding retrodictive checks.
@@ -4430,10 +4777,11 @@ don't know how much to discount the second mode.
 \subsubsection{Unknown Number of
 Components}\label{unknown-number-of-components}
 
-Finally let's see what happens when we use a mixture model with more
-components than are actually in the simulation data generating process.
-Note that we're starting with an ordering constraint to make the
-posterior distribution as well-behaved as possible.
+Finally let's see what happens when we use a mixture observational model
+with more components than are actually in the simulation data generating
+process. Note that we're starting with an ordering constraint to make
+the posterior distribution as well-behaved as possible from the
+beginning.
 
 \begin{codelisting}
 
@@ -4496,10 +4844,10 @@ posterior distribution as well-behaved as possible.
 
 We have good news and we have bad news. The good news is that there are
 almost no split \(\hat{R}\) warnings; the bad news is that just about
-every other warning shows up. In particular the tree depth saturation
-and small empirical effective sample size warnings suggest strong Markov
-chain autocorrelations which themselves hint at complex posterior
-uncertainties.
+every other warning has triggered. In particular the tree depth
+saturation and small empirical effective sample size warnings suggest
+strong Markov chain autocorrelations which themselves hint at complex
+posterior uncertainties.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -4510,13 +4858,17 @@ uncertainties.
 
 \begin{verbatim}
   Chain 1: 1 of 1024 transitions (0.1%) diverged.
-  Chain 1: 52 of 1024 transitions (5.078125%) saturated the maximum treedepth of 10.
+  Chain 1: 52 of 1024 transitions (5.08%)
+           saturated the maximum treedepth of 10.
 
-  Chain 2: 36 of 1024 transitions (3.515625%) saturated the maximum treedepth of 10.
+  Chain 2: 36 of 1024 transitions (3.52%)
+           saturated the maximum treedepth of 10.
 
-  Chain 3: 116 of 1024 transitions (11.328125%) saturated the maximum treedepth of 10.
+  Chain 3: 116 of 1024 transitions (11.33%)
+           saturated the maximum treedepth of 10.
 
-  Chain 4: 182 of 1024 transitions (17.7734375%) saturated the maximum treedepth of 10.
+  Chain 4: 182 of 1024 transitions (17.77%)
+           saturated the maximum treedepth of 10.
 
   Divergent Hamiltonian transitions result from unstable numerical
 trajectories.  These instabilities are often due to degenerate target
@@ -4630,11 +4982,11 @@ Small empirical effective sample sizes result in imprecise Markov chain
 Monte Carlo estimators.
 \end{verbatim}
 
-In general I do not recommend looking at every possible pairs plot;
-instead I prefer using the model structure to prioritize a reasonable
-number of pairs plots. In this case, however, I want to show all of the
-pairs plots just to demonstrate how degenerate the mixture model
-posterior distribution has become. It truly is the stuff of statistical
+In general I do not recommend looking at every possible pair plot; it is
+much more productive to use the model structure to prioritize a
+reasonable number of pair plots. In this case, however, I want to show
+all of the pair plots just to demonstrate how degenerate the posterior
+distribution has become here. It truly is the stuff of statistical
 nightmares.
 
 \begin{Shaded}
@@ -4686,16 +5038,16 @@ reasonably reliable.
 \includegraphics{mixture_modeling_files/figure-pdf/unnamed-chunk-88-1.pdf}
 
 To better understand all of these intricate degeneracies let's take a
-look at the underlying mixture model and reason about the many different
-ways that it can contort itself while maintaining consistency with the
-observed data. Ultimately a mixture model with too many components needs
-to find a way to hide, if not outright eliminate, the contribution from
-the extraneous components.
+look at the underlying mixture observational model and reason about the
+many different ways that it can contort itself while maintaining
+consistency with the observed data. Ultimately a mixture observational
+model with too many components needs to find a way to hide, if not
+outright eliminate, the contribution from the extraneous components.
 
-For example some of the contribution from some of the component models
-can be ``turned off'' if the corresponding component probabilities are
-close to zero. Indeed we can see bands of low component probabilities in
-the pairs plots.
+For example the contribution from some of the component models can be
+``turned off'' if the corresponding component probabilities are close to
+zero. Indeed we can see bands of small component probabilities in the
+pair plots.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -4712,10 +5064,10 @@ the pairs plots.
 
 \includegraphics{mixture_modeling_files/figure-pdf/unnamed-chunk-89-1.pdf}
 
-Let's use the structure of these bands to define a cut-off between the
-``active'' components that substantially contribute to the overall
-mixture probability distribution and the ``inactive'' components that
-offer only negligible contributions. This cut-off then allows us to
+Let's use the structure of these bands to define a heuristic cut-off
+between the ``active'' components that substantially contribute to the
+overall mixture probability distribution and the ``inactive'' components
+that offer only negligible contributions. This cut-off then allows us to
 approximately count the number of active components in each model
 configuration.
 
@@ -4745,13 +5097,13 @@ process?
 
 Well the suppression of model configurations with only one or two active
 components make sense. None of these model configurations are able to
-capture the three-peaks in the observed data.
+capture all three peaks in the observed data.
 
 The model configurations with three active components are perhaps the
 most intuitive given the three-component structure of the simulation
 data generating process. Interestingly \emph{which} two components are
-turned off is not fixed but rather vary as the Markov chains evolve. For
-example sometimes \texttt{lambda{[}1{]}} is close to zero while
+turned off is not fixed but rather varies as the Markov chains evolve.
+For example sometimes \texttt{lambda{[}1{]}} is close to zero while
 \texttt{lambda{[}2{]}} is not and sometimes \texttt{lambda{[}2{]}} is
 close to zero while \texttt{lambda{[}1{]}} is not. Sometimes they're
 both far enough away from zero for the corresponding component models to
@@ -4770,8 +5122,8 @@ be negligible.
 
 Note also that when a component becomes inactive the corresponding
 location and scale parameters are no longer informed by the observed
-data and instead relax back to the prior model. This explains some of
-the ridges that we see in the pairs plots.
+data and their posterior behaviors relax back to the prior constraints.
+This explains some of the ridges that we see in the pair plots.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -4799,21 +5151,21 @@ components. In these cases neighboring components need to collapse
 against each other so that their sum reconstructs one of the true
 components in the simulation data generating process.
 
-The components in simulation data generating process are centered at
-values of \(-4\), \(1\), and \(3\) respectively. Consequently the
-distances between the true location parameters are \(5\) and \(2\). If
-two or more neighboring components in the mixture model collapse against
-each other at certain model configurations, however, then the distance
-between them should be \(0\) or as close to zero that the ordering
-constraint will allow.
+The true components in the simulation data generating process are
+centered at values of \(-4\), \(1\), and \(3\) respectively.
+Consequently the distances between the true location parameters are
+\(5\) and \(2\). If two or more neighboring components in the mixture
+observational model collapse against each other at certain model
+configurations, however, then the distance between them will be zero, or
+as close to zero that the ordering constraint will allow.
 
 In other words the pushforward posterior distribution for the separation
 between components should exhibit peaks at distances of \(2\) and \(5\).
 If we have extraneous components that collapse together at some model
-configurations then we should also see a peak at a distance of \(0\).
-Finally the location parameters of inactive components will not be
-coupled to the location parameters of any neighboring components,
-contributing a more diffuse background.
+configurations then we should also see an additional peak at a distance
+of \(0\). Finally the location parameters of inactive components will
+not be coupled to the location parameters of any neighboring components,
+contributing a diffuse background beneath these peaks.
 
 Indeed once we construct the pushforward posterior distributions for the
 distances we see exactly these behaviors.
@@ -4863,38 +5215,40 @@ For example we might use a prior model for the component probabilities
 that concentrates on the simplex boundaries, encouraging the
 deactivation of any unnecessary components. That said we'd still have to
 contend with a degeneracy regarding which of the components are
-deactivated.
+deactivated. Moreover we would have to carefully tune the prior model to
+ensure that we allow as many components to activate as needed to
+adequately model the observed data.
 
-Similarly one approach to avoiding component collapse, indeed one that
-shows up over and over again in the statistics literature, is to employ
+One approach to avoiding component collapse, indeed one that shows up
+over and over again in the statistics literature, is to employ
 \emph{repulsive} prior models for the component locations. These prior
 models are designed to suppress model configurations where the component
-probability distributions are too close to each other but without
-necessarily breaking exchangeability. Consequently they have to be used
-in tandem with other methods, such as a sparsifying prior model for the
-component probabilities and/or ordering constraints.
+probability distributions are too close to each other. This approach is
+often used in tandem with other approaches, such as a sparsifying prior
+model for the component probabilities and/or ordering constraints.
 
 Combining enough of these strategies together can absolutely yield
 reasonable results in some cases. To be honest, however, I have not
 found any combination of heuristics to be robust enough to make
-exchangeable mixture models a reliably productive tool in practice.
+redundant mixture observational models a reliably productive tool in
+practice.
 
-Beyond computational considerations exchangeable mixture models also
-suffer from fundamental interpretation issues. Because of the
-possibility of extraneous components we cannot in general associate the
-individual component models with explicit features of the true data
-generating process. In particular we cannot interpret inferences for the
-component model configurations independently of the others. At that
-point we are not really learning about the true data generating process
-so much as particular patterns that happen to arise in particular
-observations.
+Beyond computational considerations redundant mixture observational
+models also suffer from fundamental interpretation issues. Because of
+the possibility of extraneous components we cannot in general associate
+the individual component observational models with explicit features of
+the true data generating process. In particular we cannot interpret
+inferences for the component model configurations independently of the
+others. At that point we are not really learning about the structure of
+the true data generating process so much as learning particular patterns
+that happen to arise in particular observations.
 
-For all of these reasons I avoid exchangeable mixture models as much as
-possible. I have found that building up mixture models from
-interpretable component models that can be tied to distinct aspects of
-the true data generating process tends to be not only more
-straightforward to implement but also yields more performant inferences
-and more generalizable predictions.
+For all of these reasons I avoid redundant mixture observational models
+as much as possible in my own analyses. I have found that building up
+mixture observational models from interpretable component observational
+models that can be tied to distinct aspects of the true data generating
+process tends to not only be more straightforward to implement but also
+yield more performant inferences and more generalizable predictions.
 
 \section{Conclusion}\label{conclusion}
 
@@ -4904,28 +5258,27 @@ simple mixture models, but the basic structure provides a foundation for
 even more sophisticated models.
 
 For example all of the examples presented in this chapter treat the
-component probabilities are parameters to be inferred. In some
+component probabilities as parameters to be inferred. In some
 applications, however, it is more useful to \emph{derive} them from the
-output of another part of the model. Amongst other features this
-approach allows the contribution of the component models to be mediated
-by external circumstances.
+output of another part of the model. This approach can, for instance,
+allow the contribution of the component models to be mediated by
+external circumstances.
 
 Similarly there's no reason why the component probabilities need to be
 static. In many applications it's natural for the component
 probabilities to vary across temporal or spatial dimensions. Modeling a
-sequence of evolving component probabilities results in powerful
-modeling techniques including the infamous hidden Markov model.
+sequence of evolving component probabilities results in some powerful
+modeling techniques, including the infamous hidden Markov model.
 
 Finally individual component models can in theory be mixture models of
-their own. Indeed nested mixture models can be interpreted as an
-implementation of discrete conditional probability theory, allowing us
-to model data generating processes with conditional, but unobserved,
-logic.
+their own. Indeed nested discrete mixture models can be interpreted as
+an implementation of conditional probability theory, allowing us to
+model data generating processes with conditional, but unobserved, logic.
 
 \section*{Acknowledgements}\label{acknowledgements}
 \addcontentsline{toc}{section}{Acknowledgements}
 
-I thank jd for helpful comments.
+I thank jd and EM Wolkovich for helpful comments.
 
 A very special thanks to everyone supporting me on Patreon: Adam
 Fleischhacker, Adriano Yoshino, Alejandro Navarro-Martínez, Alessandro
